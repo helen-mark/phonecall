@@ -2,7 +2,7 @@ import json
 import librosa
 import numpy as np
 import whisper
-import warnings
+import os
 
 #warnings.filterwarnings('ignore')
 import soundfile as sf
@@ -236,30 +236,45 @@ class AudioAnalyzer:
 
 def main():
     # 2025-10-09_08-52-53.022174_from_79851005767_to_79258972401_session_5396115979_talk_16k.wav  - плохое качество звука. Ковер забрали не с того юр лица, срочно перезвонить
-    audio_file = "audio_pool/2025-10-09_14-02-26.949832_from_79254293849_to_0389298_session_5133840927_talk_16k.wav"  # Укажите путь к вашему MP3 файлу
-    output_file = "результат_анализа7.json"
-    get_audio_info(audio_file)
+    audio_dir = 'audio_pool/'
+    out_dir = 'transcriptions/'
+    with open('quality_assessment.json', 'r') as f:
+        quality_data = json.load(f)
 
+    # Фильтруем файлы с качеством >= 7
+    high_quality_files = [
+        filename for filename in os.listdir(audio_dir)
+        if filename.endswith('.wav')
+           and filename in quality_data
+           and quality_data[filename].get('quality_score', 0) >= 7
+    ]
+
+    print(f"Найдено {len(high_quality_files)} файлов высокого качества")
     # Инициализация анализатора
-    analyzer = AudioAnalyzer(model_size="medium")  # Используйте "tiny" для быстрого тестирования
+    analyzer = AudioAnalyzer(model_size="large")  # Используйте "tiny" для быстрого тестирования
+
+    for filename in high_quality_files:
+        audio_file = os.path.join(audio_dir, filename)
+        output_file = os.path.join(out_dir, filename[:-4] + '.json')
+        get_audio_info(audio_file)
 
 
-    try:
-        result = analyzer.analyze_audio_file(audio_file, output_file)
+        try:
+            result = analyzer.analyze_audio_file(audio_file, output_file)
 
-        # Вывод кратких результатов в консоль
-        print("\n" + "=" * 50)
-        print("КРАТКИЕ РЕЗУЛЬТАТЫ:")
-        print("=" * 50)
-        print(f"Текст: {result['transcription']['text'][:200]}...")
-        print(f"Длительность: {result['summary']['audio_duration_seconds']} сек.")
-        print(f"Язык: {result['transcription']['language']}")
-        print(f"Характеристики: {', '.join(result['summary']['speech_characteristics'])}")
-        print(f"Средняя высота тона: {result['audio_features']['pitch']['mean']:.2f} Hz")
-        print(f"Вариативность громкости: {result['audio_features']['loudness']['std']:.4f}")
+            # Вывод кратких результатов в консоль
+            print("\n" + "=" * 50)
+            print("КРАТКИЕ РЕЗУЛЬТАТЫ:")
+            print("=" * 50)
+            print(f"Текст: {result['transcription']['text'][:200]}...")
+            print(f"Длительность: {result['summary']['audio_duration_seconds']} сек.")
+            print(f"Язык: {result['transcription']['language']}")
+            print(f"Характеристики: {', '.join(result['summary']['speech_characteristics'])}")
+            print(f"Средняя высота тона: {result['audio_features']['pitch']['mean']:.2f} Hz")
+            print(f"Вариативность громкости: {result['audio_features']['loudness']['std']:.4f}")
 
-    except Exception as e:
-        print(f"Ошибка при анализе файла: {e}")
+        except Exception as e:
+            print(f"Ошибка при анализе файла: {e}")
 
 
 if __name__ == "__main__":
