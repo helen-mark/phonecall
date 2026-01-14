@@ -5,7 +5,7 @@ import json
 class DeepSeekAnalyzer:
     """LLM, которая анализирует результаты и формулирует ответ"""
 
-    def __init__(self, model_name: str = "deepseek-coder:6.7b"):
+    def __init__(self, model_name: str):
         self.client = ollama.Client()
         self.model_name = model_name
 
