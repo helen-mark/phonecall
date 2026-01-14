@@ -85,7 +85,7 @@ class JSONDataLoader:
                     'day': call_date.day,
                     'full_text': data.get('text', ''),
                     'summary': data.get('reason', ''),
-                    'tags': data.get('tags', []),
+                    'tags': data.get('tags').get('fixed_tags', []),
                     'text_length': len(data.get('text', '')),
                     'source_file': filepath
                 }
@@ -451,6 +451,8 @@ class JSONQueryExecutor:
                     plan.comparison_tags or plan.target_tags[:2]
                 )
 
+            print(f'executions result: {results}')
+
         # Добавляем общую статистику
         results['summary_stats'] = {
             'total_calls': len(filtered_calls),
@@ -581,30 +583,33 @@ class DeepSeekAnalyzer:
 
         # Форматируем результаты для промпта
         results_str = json.dumps(results, ensure_ascii=False, indent=2, default=str)
+        print(f'Generating answer using plan results: {results} for plan: {plan}')
+        print(f'User query: {user_query}')
 
         return f"""Ты — старший аналитик компании по аренде ковров.
 
 ЗАПРОС КЛИЕНТА: "{user_query}"
 
-КАК МЫ АНАЛИЗИРОВАЛИ:
-- Период: {plan.time_period['description']}
-- Анализируемые теги: {', '.join(plan.target_tags)}
-- Метрики: {[m.value for m in plan.metrics]}
+Для ответа на запрос система выбрала тексты обращений клиентов за нужный период и посчитала нужные метрики.
+- Период, которым интересовался клиент: {plan.time_period['description']}
+- Подходящие теги, которые выбрала система для выбора обращений для анализа данного запроса: {', '.join(plan.target_tags)}
+- Метрики, которые система подсчитала для выполнения данного запроса, на основании текстов обращений, отобранных по этим тегам: {[m.value for m in plan.metrics]}
 
-РЕЗУЛЬТАТЫ АНАЛИЗА:
+Вот результаты, которые выдала система по подсчетам метрик для этих тегов:
 {results_str}
 
 ТВОЯ ЗАДАЧА:
-1. Проанализировать цифры
-2. Ответить на вопрос клиента
+1. Проанализировать цифры в этих результатах (если результат не пустой!)
+2. Ответить на запрос клиента
 3. Выделить ключевые инсайты
-4. Дать рекомендации если уместно
-5. Говорить конкретно, с цифрами
+4. Говорить конкретно, с цифрами
 
 ФОРМАТ:
 - Краткий вывод
 - Детальный анализ
 - Рекомендации (если есть)
+
+Если ты видишь, что система дала тебе пустые метрики, или информации в результатах не достаточно для ответа на запрос клиента, - так и напиши.
 
 ОТВЕТ НА РУССКОМ:"""
 

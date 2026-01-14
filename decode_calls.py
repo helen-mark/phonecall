@@ -254,8 +254,29 @@ def main():
     analyzer = AudioAnalyzer(model_size="large")  # Используйте "tiny" для быстрого тестирования
 
     for filename in high_quality_files:
+
         audio_file = os.path.join(audio_dir, filename)
-        output_file = os.path.join(out_dir, filename[:-4] + '.json')
+        output_filename = filename[:-4] + '.json'
+        output_file = os.path.join(out_dir, output_filename)
+
+        n = 0
+        if output_filename in os.listdir(out_dir):
+            n += 1
+            continue
+    print(f"{n} files already processed")
+
+    for filename in high_quality_files:
+
+        audio_file = os.path.join(audio_dir, filename)
+        output_filename = filename[:-4] + '.json'
+        output_file = os.path.join(out_dir, output_filename)
+
+        n = 0
+        if output_filename in os.listdir(out_dir):
+            n += 1
+            continue
+        print(f"{n} files already processed")
+
         get_audio_info(audio_file)
 
 
