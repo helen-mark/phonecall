@@ -8,6 +8,7 @@ from enum import Enum
 from collections import defaultdict, Counter
 import sqlite3
 from contextlib import contextmanager
+import pandas as pd
 import time
 from pathlib import Path
 
@@ -51,7 +52,7 @@ class DriveDataLoader:
     """Загружает и управляет данными из Google Drive JSON файлов"""
 
     def __init__(self, json_directory: str, drive_path: str = None):
-        self.json_dir = json_directory
+        self.csv_dir = json_directory
         self.drive_path = drive_path
         self.calls_cache = None
         self.conn = None
@@ -59,17 +60,17 @@ class DriveDataLoader:
 
     def _check_drive_access(self):
         """Проверяет доступ к Google Drive"""
-        if self.drive_path and 'drive' in self.json_dir:
-            print(f"🌐 Использую Google Drive: {self.json_dir}")
+        if self.drive_path and 'drive' in self.csv_dir:
+            print(f"🌐 Использую Google Drive: {self.csv_dir}")
 
             # Проверяем существование директории
-            if not os.path.exists(self.json_dir):
-                print(f"⚠️  Директория не найдена в Drive: {self.json_dir}")
+            if not os.path.exists(self.csv_dir):
+                print(f"⚠️  Директория не найдена в Drive: {self.csv_dir}")
                 print("ℹ️  Создаю директорию...")
-                os.makedirs(self.json_dir, exist_ok=True)
+                os.makedirs(self.csv_dir, exist_ok=True)
 
                 # Создаем README файл
-                readme_path = os.path.join(self.json_dir, "README.txt")
+                readme_path = os.path.join(self.csv_dir, "README.txt")
                 with open(readme_path, 'w', encoding='utf-8') as f:
                     f.write("Директория для JSON файлов телефонных звонков\n")
                     f.write("Загрузите сюда файлы в формате JSON\n")
@@ -87,34 +88,32 @@ class DriveDataLoader:
         all_calls = []
 
         # Проверяем существование директории
-        if not os.path.exists(self.data_dir):
-            print(f"❌ Директория не найдена: {self.data_dir}")
+        if not os.path.exists(self.csv_dir):
+            print(f"❌ Директория не найдена: {self.csv_dir}")
             if self.drive_path:
                 print(f"ℹ️  Убедитесь, что папка существует в Google Drive")
-                print(f"📍 Ожидаемый путь: {self.data_dir}")
+                print(f"📍 Ожидаемый путь: {self.csv_dir}")
             return []
 
         # Ищем CSV файлы
         try:
-            csv_files = [f for f in os.listdir(self.data_dir) if f.endswith('.csv')]
+            csv_files = [f for f in os.listdir(self.csv_dir) if f.endswith('.csv')]
         except Exception as e:
             print(f"❌ Ошибка чтения директории: {e}")
             return []
 
         if not csv_files:
-            print(f"⚠️  В директории {self.data_dir} нет CSV файлов")
+            print(f"⚠️  В директории {self.csv_dir} нет CSV файлов")
             print("ℹ️  Ожидаемый формат CSV: колонки 'date', 'text', 'tags'")
             return []
 
         # Берем первый CSV файл (можно расширить для нескольких)
         csv_file = csv_files[0]
-        filepath = os.path.join(self.data_dir, csv_file)
+        filepath = os.path.join(self.csv_dir, csv_file)
 
         print(f"📂 Читаю данные из CSV файла: {csv_file}")
 
         try:
-            import pandas as pd
-
             # Читаем CSV файл
             df = pd.read_csv(
                 filepath,
@@ -231,7 +230,7 @@ class DriveDataLoader:
                         return datetime(year, month, day)
 
         # Если дата не найдена, используем дату изменения файла
-        filepath = os.path.join(self.json_dir, filename)
+        filepath = os.path.join(self.csv_dir, filename)
         if os.path.exists(filepath):
             try:
                 return datetime.fromtimestamp(os.path.getmtime(filepath))
@@ -964,7 +963,7 @@ class JSONCallAnalyticsMCP:
             if not calls:
                 print("❌ Нет данных для анализа")
                 if self.drive_path:
-                    print(f"ℹ️  Проверьте Google Drive: {self.data_loader.json_dir}")
+                    print(f"ℹ️  Проверьте Google Drive: {self.data_loader.csv_dir}")
                 return False
 
             print(f"✅ Загружено {len(calls)} тестовых записей")
