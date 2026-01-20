@@ -5,7 +5,7 @@ import ollama
 from pathlib import Path
 
 
-def enhanced_interactive_mode(_model: str, json_dir: str = None, results_dir: str = None, drive_path: str = None):
+def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str = None, drive_path: str = None):
     """Расширенный интерактивный режим с поддержкой Google Drive"""
 
     def show_help(in_drive_mode: bool):
@@ -39,7 +39,7 @@ def enhanced_interactive_mode(_model: str, json_dir: str = None, results_dir: st
       • Модели кэшируются для ускорения работы
 
     ДОСТУП К ДАННЫМ:
-      • Данные читаются из папки json_calls/ в вашем Drive
+      • Данные читаются из папки csv_calls/ в вашем Drive
       • Чтобы обновить данные, просто загрузите новые файлы в эту папку
     """
 
@@ -152,7 +152,7 @@ def enhanced_interactive_mode(_model: str, json_dir: str = None, results_dir: st
             except Exception as e:
                 print(f"   ❌ Ошибка: {e}")
 
-    def show_directories(json_dir, results_dir, drive_path=None):
+    def show_directories(csv_dir, results_dir, drive_path=None):
         """Показывает структуру директорий"""
         print("\n📁 СТРУКТУРА ДИРЕКТОРИЙ:")
         print("-" * 50)
@@ -162,14 +162,9 @@ def enhanced_interactive_mode(_model: str, json_dir: str = None, results_dir: st
             print("-" * 50)
 
         # Показываем JSON директорию
-        print(f"📊 Данные звонков ({json_dir}):")
-        if os.path.exists(json_dir):
-            json_files = [f for f in os.listdir(json_dir) if f.endswith('.json')]
-            print(f"   📄 JSON файлов: {len(json_files)}")
-            if json_files:
-                print(f"   📅 Примеры: {', '.join(json_files[:3])}")
-                if len(json_files) > 3:
-                    print(f"   ... и еще {len(json_files) - 3} файлов")
+        print(f"📊 Данные звонков ({csv_dir}):")
+        if os.path.exists(csv_dir):
+            print(f"   📄 файлов: {len(csv_dir)}")
         else:
             print("   ❌ Директория не существует")
 
@@ -196,12 +191,12 @@ def enhanced_interactive_mode(_model: str, json_dir: str = None, results_dir: st
     if IN_DRIVE_MODE:
         print(f"📍 Режим: Google Drive")
         print(f"📁 Основной путь: {drive_path}")
-        print(f"📊 Данные: {json_dir}")
+        print(f"📊 Данные: {csv_dir}")
         print(f"💾 Сохранение: {results_dir}")
         print("-" * 50)
 
     # Инициализация системы
-    JSON_DIRECTORY = json_dir if json_dir else "json_calls"
+    JSON_DIRECTORY = csv_dir if csv_dir else "csv_calls"
     RESULTS_DIRECTORY = results_dir if results_dir else "saved_results"
 
     # Проверяем директории
@@ -211,11 +206,11 @@ def enhanced_interactive_mode(_model: str, json_dir: str = None, results_dir: st
         if IN_DRIVE_MODE:
             print(f"\n📝 Для загрузки файлов в Google Drive:")
             print(f"1. Откройте {drive_path} в браузере")
-            print(f"2. Создайте папку 'json_calls'")
-            print(f"3. Загрузите туда JSON файлы")
+            print(f"2. Создайте папку 'csv_calls'")
+            print(f"3. Загрузите туда файл")
             print(f"4. Перезапустите систему")
         else:
-            print("Сначала добавьте JSON файлы в директорию json_calls/")
+            print("Сначала добавьте csv файл в директорию csv_calls/")
 
         return
 

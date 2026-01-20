@@ -80,86 +80,131 @@ class DriveDataLoader:
                 print(f"✅ Директория найдена в Google Drive")
 
     def load_all_calls(self, limit: int = None) -> List[Dict]:
-        """Загружает все звонки из JSON файлов в Google Drive"""
+        """Загружает все звонки из CSV файла"""
         if self.calls_cache is not None:
             return self.calls_cache[:limit] if limit else self.calls_cache
 
         all_calls = []
-        files_processed = 0
-        errors = 0
 
         # Проверяем существование директории
-        if not os.path.exists(self.json_dir):
-            print(f"❌ Директория не найдена: {self.json_dir}")
+        if not os.path.exists(self.data_dir):
+            print(f"❌ Директория не найдена: {self.data_dir}")
             if self.drive_path:
                 print(f"ℹ️  Убедитесь, что папка существует в Google Drive")
-                print(f"📍 Ожидаемый путь: {self.json_dir}")
+                print(f"📍 Ожидаемый путь: {self.data_dir}")
             return []
 
-        # Получаем список файлов
+        # Ищем CSV файлы
         try:
-            files = sorted([f for f in os.listdir(self.json_dir) if f.endswith('.json')])
+            csv_files = [f for f in os.listdir(self.data_dir) if f.endswith('.csv')]
         except Exception as e:
             print(f"❌ Ошибка чтения директории: {e}")
             return []
 
-        if not files:
-            print(f"⚠️  В директории {self.json_dir} нет JSON файлов")
-            if self.drive_path:
-                print("ℹ️  Загрузите JSON файлы в Google Drive")
+        if not csv_files:
+            print(f"⚠️  В директории {self.data_dir} нет CSV файлов")
+            print("ℹ️  Ожидаемый формат CSV: колонки 'date', 'text', 'tags'")
             return []
 
-        print(f"📂 Найдено {len(files)} JSON файлов в {'Google Drive' if self.drive_path else 'локальной папке'}")
+        # Берем первый CSV файл (можно расширить для нескольких)
+        csv_file = csv_files[0]
+        filepath = os.path.join(self.data_dir, csv_file)
 
-        for filename in files:
-            filepath = os.path.join(self.json_dir, filename)
+        print(f"📂 Читаю данные из CSV файла: {csv_file}")
 
-            try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+        try:
+            import pandas as pd
 
-                # Извлекаем дату из имени файла
-                call_date = self._extract_date_from_filename(filename)
+            # Читаем CSV файл
+            df = pd.read_csv(
+                filepath,
+                encoding='utf-8',
+                parse_dates=['date'],  # Автоматически парсим дату
+                converters={
+                    'tags': lambda x: eval(x) if isinstance(x, str) else []  # Конвертируем строку в список
+                }
+            )
+
+            # Проверяем необходимые колонки
+            required_columns = ['date', 'text', 'tags']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+
+            if missing_columns:
+                print(f"❌ В CSV файле отсутствуют колонки: {missing_columns}")
+                print(f"   Доступные колонки: {list(df.columns)}")
+                return []
+
+            print(f"✅ Загружено {len(df)} строк из CSV")
+
+            # Конвертируем DataFrame в список словарей
+            for idx, row in df.iterrows():
+                # Получаем дату (уже в формате datetime благодаря parse_dates)
+                call_date = row['date']
+
+                # Если tags - строка, конвертируем в список
+                tags = row['tags']
+                if isinstance(tags, str):
+                    try:
+                        # Обрабатываем формат: "['tag1', 'tag2']"
+                        tags = eval(tags) if tags.startswith('[') else tags.split(',')
+                    except:
+                        tags = []
 
                 # Формируем структурированную запись
                 call_record = {
-                    'id': f"call_{files_processed}",
-                    'file_name': filename,
+                    'id': f"call_{idx}",
+                    'file_name': csv_file,
                     'call_date': call_date,
-                    'year': call_date.year,
-                    'month': call_date.month,
-                    'day': call_date.day,
-                    'full_text': data.get('text', ''),
-                    'summary': data.get('reason', ''),
-                    'tags': data.get('tags').get('fixed_tags', []),
-                    'text_length': len(data.get('text', '')),
+                    'year': call_date.year if pd.notna(call_date) else None,
+                    'month': call_date.month if pd.notna(call_date) else None,
+                    'day': call_date.day if pd.notna(call_date) else None,
+                    'full_text': str(row['text']) if pd.notna(row['text']) else '',
+                    'summary': row.get('summary', '') if 'summary' in df.columns else '',
+                    'tags': tags if isinstance(tags, list) else [tags],
+                    'text_length': len(str(row['text'])) if pd.notna(row['text']) else 0,
                     'source_file': filepath,
                     'drive_path': self.drive_path if self.drive_path else None
                 }
 
                 all_calls.append(call_record)
-                files_processed += 1
 
-                if limit and files_processed >= limit:
+                # Ограничение по количеству записей
+                if limit and idx + 1 >= limit:
                     break
 
-            except json.JSONDecodeError as e:
-                print(f"⚠️  Ошибка JSON в файле {filename}: {e}")
-                errors += 1
-            except Exception as e:
-                print(f"⚠️  Ошибка загрузки {filename}: {e}")
-                errors += 1
+            self.calls_cache = all_calls
 
-        self.calls_cache = all_calls
+            # Выводим статистику
+            print(f"✅ Преобразовано {len(all_calls)} записей звонков")
 
-        print(f"✅ Загружено {len(all_calls)} звонков из JSON файлов")
-        if errors > 0:
-            print(f"⚠️  Пропущено {errors} файлов с ошибками")
+            if self.drive_path:
+                print(f"🌐 Данные загружены из Google Drive")
 
-        if self.drive_path and all_calls:
-            print(f"🌐 Данные загружены из Google Drive ({len(all_calls)} записей)")
+            # Дополнительная информация о данных
+            if all_calls:
+                dates = [c['call_date'] for c in all_calls if c['call_date']]
+                if dates:
+                    min_date = min(dates)
+                    max_date = max(dates)
+                    print(f"📅 Диапазон дат: {min_date.strftime('%d.%m.%Y')} - {max_date.strftime('%d.%m.%Y')}")
 
-        return all_calls
+                # Подсчет уникальных тегов
+                all_tags = []
+                for call in all_calls:
+                    all_tags.extend(call['tags'])
+                unique_tags = set(all_tags)
+                print(f"🏷️  Уникальных тегов: {len(unique_tags)}")
+
+            return all_calls
+
+        except pd.errors.EmptyDataError:
+            print(f"❌ CSV файл {csv_file} пустой")
+            return []
+        except Exception as e:
+            print(f"❌ Ошибка чтения CSV файла {csv_file}: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def _extract_date_from_filename(self, filename: str) -> datetime:
         """Извлекает дату из имени файла"""

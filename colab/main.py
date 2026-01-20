@@ -29,7 +29,7 @@ def get_drive_path(base_path="call_analytics"):
     os.makedirs(full_path, exist_ok=True)
 
     # Создаем поддиректории
-    directories = ['json_calls', 'saved_results', 'logs', 'models_cache']
+    directories = ['csv_calls', 'saved_results', 'logs', 'models_cache']
     for dir_name in directories:
         os.makedirs(os.path.join(full_path, dir_name), exist_ok=True)
 
@@ -45,8 +45,8 @@ def check_drive_contents(drive_path):
         for item in os.listdir(drive_path):
             item_path = os.path.join(drive_path, item)
             if os.path.isdir(item_path):
-                file_count = len([f for f in os.listdir(item_path) if f.endswith('.json')])
-                print(f"  📂 {item}/ - {file_count} JSON файлов")
+                file_count = len([f for f in os.listdir(item_path) if f.endswith('.csv')])
+                print(f"  📂 {item}/ - {file_count} csv файлов")
             else:
                 print(f"  📄 {item}")
     else:
@@ -68,18 +68,18 @@ if __name__ == "__main__":
         check_drive_contents(drive_path)
 
         # Пути к данным в Drive
-        json_dir = os.path.join(drive_path, "json_calls")
+        csv_dir = os.path.join(drive_path, "csv_calls")
         results_dir = os.path.join(drive_path, "saved_results")
 
         print(f"\n📍 Использую пути:")
-        print(f"   📁 JSON данные: {json_dir}")
+        print(f"   📁 Данные: {csv_dir}")
         print(f"   💾 Результаты: {results_dir}")
         print(f"   🔧 Логи: {os.path.join(drive_path, 'logs')}")
 
         # Автоматический режим для Colab
         args = type('Args', (), {
             'mode': 'interactive',
-            'json_dir': json_dir,
+            'csv_dir': csv_dir,
             'results_dir': results_dir,
             'model': 'mistral-nemo:12b',
             'telegram_token': None,
@@ -90,7 +90,7 @@ if __name__ == "__main__":
         # Импортируем после настройки путей
         from interactive import enhanced_interactive_mode
 
-        enhanced_interactive_mode(args.model, args.json_dir, args.results_dir, args.drive_path)
+        enhanced_interactive_mode(args.model, args.csv_dir, args.results_dir, args.drive_path)
 
     else:
         # Локальный режим (без Colab)
@@ -98,8 +98,8 @@ if __name__ == "__main__":
         parser.add_argument('--mode', default='interactive',
                             choices=['interactive', 'web', 'telegram', 'api', 'test'],
                             help='Режим работы')
-        parser.add_argument('--json-dir', default='./json_calls',
-                            help='Путь к JSON файлам')
+        parser.add_argument('--csv-dir', default='./csv_calls',
+                            help='Путь к файлам')
         parser.add_argument('--results-dir', default='./saved_results',
                             help='Путь для сохранения результатов')
         parser.add_argument('--model', default='mistral-nemo:12b',
@@ -114,9 +114,9 @@ if __name__ == "__main__":
         if args.mode == 'interactive':
             from interactive import enhanced_interactive_mode
 
-            enhanced_interactive_mode(args.model, args.json_dir, args.results_dir, args.drive_path)
+            enhanced_interactive_mode(args.model, args.csv_dir, args.results_dir, args.drive_path)
         elif args.mode == 'test':
             from mcp_orchestrator import JSONCallAnalyticsMCP
 
-            system = JSONCallAnalyticsMCP(args.json_dir, args.model, args.drive_path)
+            system = JSONCallAnalyticsMCP(args.csv_dir, args.model, args.drive_path)
             system.test_system()
