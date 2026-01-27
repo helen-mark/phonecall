@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 import ollama
 from pathlib import Path
+from phonecall.colab.mcp_orchestrator import JSONCallAnalyticsMCP
 
 
 def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str = None, drive_path: str = None):
@@ -217,7 +218,6 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
     # Создаем директорию для результатов
     os.makedirs(RESULTS_DIRECTORY, exist_ok=True)
 
-    from mcp_orchestrator import JSONCallAnalyticsMCP
     system = JSONCallAnalyticsMCP(JSON_DIRECTORY, _model, drive_path)
 
     # История запросов
