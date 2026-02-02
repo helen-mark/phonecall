@@ -137,7 +137,7 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
 
     def test_system(system):
         """Тестирует систему"""
-        print("🧪 Тестирую систему...")
+        print(" Тестирую систему...")
 
         test_queries = [
             "Сколько всего звонков в базе?",
@@ -146,7 +146,7 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
         ]
 
         for query in test_queries:
-            print(f"\n📋 Тест: '{query}'")
+            print(f"\n Тест: '{query}'")
             try:
                 result = system.process_query(query)
                 print(f"   ✅ Успешно, ответ: {len(result['answer'])} симв.")
@@ -155,27 +155,27 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
 
     def show_directories(csv_dir, results_dir, drive_path=None):
         """Показывает структуру директорий"""
-        print("\n📁 СТРУКТУРА ДИРЕКТОРИЙ:")
+        print("\n СТРУКТУРА ДИРЕКТОРИЙ:")
         print("-" * 50)
 
         if drive_path:
-            print(f"📍 Google Drive корень: {drive_path}")
+            print(f" Google Drive корень: {drive_path}")
             print("-" * 50)
 
         # Показываем JSON директорию
-        print(f"📊 Данные звонков ({csv_dir}):")
+        print(f"Данные звонков ({csv_dir}):")
         if os.path.exists(csv_dir):
-            print(f"   📄 файлов: {len(csv_dir)}")
+            print(f"   файлов: {len(csv_dir)}")
         else:
-            print("   ❌ Директория не существует")
+            print("   Директория не существует")
 
         # Показываем результаты
         print(f"\n💾 Результаты ({results_dir}):")
         if os.path.exists(results_dir):
             result_files = os.listdir(results_dir)
-            print(f"   📄 Файлов результатов: {len(result_files)}")
+            print(f"   Файлов результатов: {len(result_files)}")
         else:
-            print("   ℹ️  Директория будет создана при сохранении")
+            print("   Директория будет создана при сохранении")
 
         print("-" * 50)
 
@@ -184,16 +184,16 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
 
     print("""
 ╔══════════════════════════════════════════╗
-║    🤖 АНАЛИТИК ЗВОНКОВ v3.0               ║
-║    🚀 Google Drive Edition                ║
+║      АНАЛИТИК ЗВОНКОВ v3.0               ║
+║      Google Drive Edition                ║
 ╚══════════════════════════════════════════╝
     """)
 
     if IN_DRIVE_MODE:
-        print(f"📍 Режим: Google Drive")
-        print(f"📁 Основной путь: {drive_path}")
-        print(f"📊 Данные: {csv_dir}")
-        print(f"💾 Сохранение: {results_dir}")
+        print(f"Режим: Google Drive")
+        print(f"Основной путь: {drive_path}")
+        print(f"Данные: {csv_dir}")
+        print(f"Сохранение: {results_dir}")
         print("-" * 50)
 
     # Инициализация системы
@@ -268,17 +268,17 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
                 continue
 
             elif user_input.lower() == '/режим':
-                print(f"📡 Текущий режим: {'Google Drive' if IN_DRIVE_MODE else 'Локальный'}")
+                print(f"Текущий режим: {'Google Drive' if IN_DRIVE_MODE else 'Локальный'}")
                 continue
 
             elif not user_input:
                 continue
 
             # Обработка аналитического запроса
-            print(f"🔍 Анализирую: '{user_input}'")
+            print(f"Анализирую: '{user_input}'")
 
             if IN_DRIVE_MODE:
-                print("🌐 Чтение данных из Google Drive...")
+                print("Чтение данных из Google Drive...")
 
             # Сохраняем в историю перед обработкой
             query_history.append({
@@ -304,16 +304,16 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
 
             # Показываем результат
             print("\n" + "=" * 60)
-            print(f"💡 ОТВЕТ ({processing_time:.1f} сек):")
+            print(f"ОТВЕТ ({processing_time:.1f} сек):")
             print("-" * 40)
             print(result['answer'])
             print("-" * 40)
 
             # Показываем информацию о данных
-            print(f"📊 Проанализировано звонков: {result.get('total_calls_analyzed', 0)}")
+            print(f"Проанализировано звонков: {result.get('total_calls_analyzed', 0)}")
 
             if IN_DRIVE_MODE:
-                print(f"💾 Результаты сохраняются в Google Drive")
+                print(f"Результаты сохраняются в Google Drive")
 
             # Быстрые действия
             print("\n⚡ Быстрые действия:")
@@ -326,7 +326,7 @@ def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str
         except KeyboardInterrupt:
             print("\n\n👋 Завершаю работу...")
             if IN_DRIVE_MODE:
-                print("💾 Данные сохранены в Google Drive")
+                print("Данные сохранены в Google Drive")
             break
         except Exception as e:
             print(f"\n❌ Ошибка: {e}")
