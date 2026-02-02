@@ -138,7 +138,7 @@ class DriveDataLoader:
             # Конвертируем DataFrame в список словарей
             for idx, row in df.iterrows():
                 # Получаем дату (уже в формате datetime благодаря parse_dates)
-                call_date = row['date']
+                call_date = pd.to_datetime(row['date'])
 
                 # Если tags - строка, конвертируем в список
                 tags = row['tags']
