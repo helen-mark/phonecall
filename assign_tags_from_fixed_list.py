@@ -3,10 +3,12 @@ import os
 import re
 from typing import List, Dict, Any
 import ollama  # Или openai, если используете OpenAI API
+from typing import Union
+from llama_cpp import Llama
 
 
 class JsonFileTaggingAgent:
-    def __init__(self, model_name: str, tags_list: List[str] = None):
+    def __init__(self, model: Union[str, Llama], tags_list: List[str] = None):
         """
         Инициализация агента для тегирования звонков
 
@@ -14,8 +16,14 @@ class JsonFileTaggingAgent:
             model_name: название модели Ollama
             tags_list: список тегов для классификации
         """
-        self.client = ollama.Client()
-        self.model_name = model_name
+
+        self.is_local = isinstance(model, Llama)
+        if self.is_local:
+            self.model_name = 'local'
+            self.model = model
+        else:
+            self.client = ollama.Client()
+            self.model_name = model
 
         # Стандартные теги (расширьте под свою предметную область)
         self.tags_list = tags_list
@@ -135,16 +143,22 @@ class JsonFileTaggingAgent:
 """
 
         try:
-            response = self.client.generate(
-                model=self.model_name,
-                prompt=prompt,
-                format="json",  # Критически важно для парсинга!
-                options={
-                    'temperature': 0.3,  # Минимум креативности для консистентности
-                    'num_predict': 150,
-                    'top_p': 0.9
-                }
-            )
+            if self.is_local:
+                response = self.model(prompt,
+                                      format='json',
+                                      temperature=0.3,
+                                      top_p=0.9)
+            else:
+                response = self.client.generate(
+                    model=self.model_name,
+                    prompt=prompt,
+                    format="json",  # Критически важно для парсинга!
+                    options={
+                        'temperature': 0.3,  # Минимум креативности для консистентности
+                        'num_predict': 150,
+                        'top_p': 0.9
+                    }
+                )
 
             # Извлечение JSON из ответа
             response_text = response['response']
@@ -247,13 +261,13 @@ def main():
     ]
 
     tagger = JsonFileTaggingAgent(
-        model_name="mistral-nemo:12b",  # или "mistral", "qwen2.5:7b" и т.д.
+        model="mistral-nemo:12b",  # или "mistral", "qwen2.5:7b" и т.д.
         tags_list=my_tags
     )
 
     # Обработка всей директории
     input_directory = "transcriptions/"
-    output_directory = "transcriptions_with_tags_strict_mistral-nemo12/"  # или None для перезаписи
+    output_directory = "transcriptions_with_tags_strict_deepseek/"  # или None для перезаписи
 
     # Основная обработка
     tagger.process_directory(input_directory, output_directory)

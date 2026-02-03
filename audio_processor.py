@@ -8,11 +8,13 @@ from pathlib import Path
 import subprocess
 from preprocess_calls_full import AudioProcessor
 from assign_tags_from_fixed_list import JsonFileTaggingAgent
+from typing import Union
+from llama_cpp import Llama
 
 
 class SmartAudioProcessor:
 
-    def __init__(self, drive_audio_path, output_csv_path,
+    def __init__(self, model, drive_audio_path, output_csv_path,
                  total_space_gb=80, batch_size_gb=2):
 
         my_tags = [
@@ -45,9 +47,11 @@ class SmartAudioProcessor:
         self.output_csv_path = output_csv_path
         self.total_space = total_space_gb
         self.batch_size = batch_size_gb
+
         self.ap = AudioProcessor(model_size='large')
+
         self.tagger = JsonFileTaggingAgent(
-            model_name="mistral-nemo:12b",
+            model=model,
             tags_list=my_tags
         )
 
@@ -544,44 +548,44 @@ def main():
 
     # Показываем статистику
     stats = processor.get_processing_stats()
-    print(f"\n📊 СТАТИСТИКА ДО ОБРАБОТКИ:")
-    print(f"📁 Всего файлов: {stats['total_files']:,}")
-    print(f"✅ Обработано: {stats['processed_files']:,}")
-    print(f"🎯 Осталось: {stats['remaining_files']:,}")
-    print(f"📈 Прогресс: {stats['progress_percent']:.1f}%")
-    print(f"💾 Общий объем: {stats['estimated_size_gb']:.1f} GB")
+    print(f"\nСТАТИСТИКА ДО ОБРАБОТКИ:")
+    print(f"Всего файлов: {stats['total_files']:,}")
+    print(f"Обработано: {stats['processed_files']:,}")
+    print(f"Осталось: {stats['remaining_files']:,}")
+    print(f"Прогресс: {stats['progress_percent']:.1f}%")
+    print(f"Общий объем: {stats['estimated_size_gb']:.1f} GB")
 
     if stats['last_processed']:
-        print(f"📅 Последняя обработка: {stats['last_processed']}")
+        print(f" Последняя обработка: {stats['last_processed']}")
 
     if stats['remaining_files'] == 0:
-        print("\n🎉 Все файлы уже обработаны!")
+        print("\n Все файлы уже обработаны!")
         return
 
     # Запрашиваем подтверждение
-    confirm = input(f"\n⚠️  Начать обработку {stats['remaining_files']:,} файлов? (y/n): ")
+    confirm = input(f"\n Начать обработку {stats['remaining_files']:,} файлов? (y/n): ")
 
     if confirm.lower() != 'y':
-        print("🚫 Обработка отменена")
+        print("Обработка отменена")
         return
 
     # Запускаем обработку
-    print("\n🚀 ЗАПУСК ОБРАБОТКИ...")
+    print("\n ЗАПУСК ОБРАБОТКИ...")
     results = processor.process_large_dataset()
 
     # Финальная статистика
     if results:
-        print(f"\n🎉 ОБРАБОТКА ЗАВЕРШЕНА УСПЕШНО!")
-        print(f"📊 Обработано записей: {len(results):,}")
-        print(f"💾 Результаты: {OUTPUT_CSV_PATH}")
+        print(f"\n ОБРАБОТКА ЗАВЕРШЕНА УСПЕШНО!")
+        print(f" Обработано записей: {len(results):,}")
+        print(f" Результаты: {OUTPUT_CSV_PATH}")
 
         # Показываем содержимое файла
         if os.path.exists(OUTPUT_CSV_PATH):
             df = pd.read_csv(OUTPUT_CSV_PATH)
-            print(f"📄 Размер файла: {len(df)} строк, {len(df.columns)} колонок")
-            print("📋 Колонки:", list(df.columns))
+            print(f" Размер файла: {len(df)} строк, {len(df.columns)} колонок")
+            print(" Колонки:", list(df.columns))
     else:
-        print("\n⚠️  Обработка завершена без результатов")
+        print("\n Обработка завершена без результатов")
 
 
 if __name__ == "__main__":
