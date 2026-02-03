@@ -9,8 +9,9 @@ from collections import defaultdict, Counter
 import sqlite3
 from contextlib import contextmanager
 import pandas as pd
-import time
-from pathlib import Path
+from typing import Union
+import ollama
+from llama_cpp import Llama
 
 
 # ==================== Структуры данных ====================
@@ -327,16 +328,21 @@ class DriveDataLoader:
 class DeepSeekPlanner:
     """LLM планировщик запросов"""
 
-    def __init__(self, model_name, drive_path=None):
-        self.model_name = model_name
+    def __init__(self, model, drive_path=None):
+        self.is_local = isinstance(model, Llama)
+        if self.is_local:
+            self.model = model
+            self.model_name = 'local'
+        else:
+            self.model_name = model
+            self._setup_ollama_client()
+
         self.drive_path = drive_path
         self.available_tags = self._load_available_tags()
-        self._setup_ollama_client()
 
     def _setup_ollama_client(self):
         """Настраивает клиент Ollama с учетом Google Drive"""
         try:
-            import ollama
             # Настройка для Colab
             host = "http://localhost:11434"
 
@@ -396,12 +402,18 @@ class DeepSeekPlanner:
         prompt = self._build_planner_prompt(user_query)
 
         try:
-            response = self.client.generate(
-                model=self.model_name,
-                prompt=prompt,
-                format="json",
-                options={'temperature': 0.1, 'num_predict': 500}
-            )
+            if self.is_local:
+                response = self.model(
+                    prompt,
+                    max_tokens=500,
+                    temperature=0.1)
+            else:
+                response = self.client.generate(
+                    model=self.model_name,
+                    prompt=prompt,
+                    format="json",
+                    options={'temperature': 0.1, 'num_predict': 500}
+                )
 
             plan_data = json.loads(response['response'])
 
@@ -718,19 +730,26 @@ class JSONQueryExecutor:
 class DeepSeekAnalyzer:
     """LLM для анализа результатов и генерации ответов"""
 
-    def __init__(self, model_name: str, drive_path: str = None):
-        self.model_name = model_name
+    def __init__(self, model: Union[str, Llama], drive_path: str = None):
+        self.is_local = isinstance(model, Llama)
+
+        if self.is_local:
+            self.model_name = 'local'
+            self.model = model
+        else:
+            self.model_name = model
+            try:
+                self.client = ollama.Client(
+                    host="http://localhost:11434",
+                    timeout=90.0  # Увеличенный таймаут для больших моделей
+                )
+            except ImportError:
+                print("❌ Ollama не установлен")
+                raise
+
         self.drive_path = drive_path
 
-        try:
-            import ollama
-            self.client = ollama.Client(
-                host="http://localhost:11434",
-                timeout=90.0  # Увеличенный таймаут для больших моделей
-            )
-        except ImportError:
-            print("❌ Ollama не установлен")
-            raise
+
 
     def generate_answer(self, user_query: str, results: Dict, plan: AnalysisPlan) -> str:
         """Генерирует итоговый ответ на основе результатов"""
@@ -738,11 +757,16 @@ class DeepSeekAnalyzer:
         prompt = self._build_analyzer_prompt(user_query, results, plan)
 
         try:
-            response = self.client.generate(
-                model=self.model_name,
-                prompt=prompt,
-                options={'temperature': 0.3, 'num_predict': 1000}
-            )
+            if self.is_local:
+                response = self.model(prompt,
+                                      temperature=0.3,
+                                      num_predict=1000)
+            else:
+                response = self.client.generate(
+                    model=self.model_name,
+                    prompt=prompt,
+                    options={'temperature': 0.3, 'num_predict': 1000}
+                )
 
             return response['response'].strip()
 
@@ -829,12 +853,12 @@ class DeepSeekAnalyzer:
 class JSONCallAnalyticsMCP:
     """Главная MCP система для работы с Google Drive JSON файлами"""
 
-    def __init__(self, json_directory: str, model_name: str, drive_path: str = None):
+    def __init__(self, json_directory: str, model: Union[str, Llama], drive_path: str = None):
         self.drive_path = drive_path
         self.data_loader = DriveDataLoader(json_directory, drive_path)
-        self.planner = DeepSeekPlanner(model_name, drive_path)
+        self.planner = DeepSeekPlanner(model, drive_path)
         self.executor = JSONQueryExecutor(self.data_loader)
-        self.analyzer = DeepSeekAnalyzer(model_name, drive_path)
+        self.analyzer = DeepSeekAnalyzer(model, drive_path)
 
         # Загружаем данные при инициализации
         print("📂 Загружаю данные из JSON файлов...")
@@ -861,7 +885,7 @@ class JSONCallAnalyticsMCP:
         print("🤖 Создаю план анализа...")
         analysis_plan = self.planner.create_analysis_plan(user_query)
 
-        print(f"   📅 Период: {analysis_plan.time_period['description']}")
+        print(f"   📅 Период: {analysis_plan.time_period['description']}, {analysis_plan.time_period['start']}, {analysis_plan.time_period['description']['end']}")
         print(f"   🏷️  Теги: {', '.join(analysis_plan.target_tags)}")
         print(f"   📊 Метрики: {[m.value for m in analysis_plan.metrics]}")
 

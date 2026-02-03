@@ -4,9 +4,11 @@ from datetime import datetime
 import ollama
 from pathlib import Path
 from phonecall.colab.mcp_orchestrator import JSONCallAnalyticsMCP
+from typing import Union
+from llama_cpp import Llama
 
 
-def enhanced_interactive_mode(_model: str, csv_dir: str = None, results_dir: str = None, drive_path: str = None):
+def enhanced_interactive_mode(_model: Union[str, Llama], csv_dir: str = None, results_dir: str = None, drive_path: str = None):
     """Расширенный интерактивный режим с поддержкой Google Drive"""
 
     def show_help(in_drive_mode: bool):
