@@ -330,6 +330,10 @@ class DeepSeekPlanner:
 
     def __init__(self, model, datasphere_node_url=None, drive_path=None):
         self.is_local = isinstance(model, Llama)
+
+        self.drive_path = drive_path
+        self.available_tags = self._load_available_tags()
+
         if self.is_local:
             self.model = model
             self.model_name = 'local'
@@ -342,8 +346,6 @@ class DeepSeekPlanner:
             self._setup_ollama_client()
 
 
-        self.drive_path = drive_path
-        self.available_tags = self._load_available_tags()
 
     def _setup_ollama_client(self):
         """Настраивает клиент Ollama с учетом Google Drive"""
