@@ -8,7 +8,7 @@ from typing import Union
 from llama_cpp import Llama
 
 
-def enhanced_interactive_mode(_model: Union[str, Llama], csv_dir: str = None, results_dir: str = None, drive_path: str = None):
+def enhanced_interactive_mode(_model: Union[str, Llama], node_url = None, csv_dir: str = None, results_dir: str = None, drive_path: str = None):
     """Расширенный интерактивный режим с поддержкой Google Drive"""
 
     def show_help(in_drive_mode: bool):
@@ -220,7 +220,7 @@ def enhanced_interactive_mode(_model: Union[str, Llama], csv_dir: str = None, re
     # Создаем директорию для результатов
     os.makedirs(RESULTS_DIRECTORY, exist_ok=True)
 
-    system = JSONCallAnalyticsMCP(JSON_DIRECTORY, _model, drive_path)
+    system = JSONCallAnalyticsMCP(JSON_DIRECTORY, _model, node_url, drive_path)
 
     # История запросов
     query_history = []

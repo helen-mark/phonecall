@@ -328,14 +328,19 @@ class DriveDataLoader:
 class DeepSeekPlanner:
     """LLM планировщик запросов"""
 
-    def __init__(self, model, drive_path=None):
+    def __init__(self, model, datasphere_node_url=None, drive_path=None):
         self.is_local = isinstance(model, Llama)
         if self.is_local:
             self.model = model
             self.model_name = 'local'
+        elif datasphere_node_url:
+            self.client = ollama.Client(host=datasphere_node_url)
+            self.model_name = 'from_yandex_node'
+            print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
             self.model_name = model
             self._setup_ollama_client()
+
 
         self.drive_path = drive_path
         self.available_tags = self._load_available_tags()
@@ -730,12 +735,16 @@ class JSONQueryExecutor:
 class DeepSeekAnalyzer:
     """LLM для анализа результатов и генерации ответов"""
 
-    def __init__(self, model: Union[str, Llama], drive_path: str = None):
+    def __init__(self, model: Union[str, Llama], datasphere_node_url = None, drive_path: str = None):
         self.is_local = isinstance(model, Llama)
 
         if self.is_local:
             self.model_name = 'local'
             self.model = model
+        elif datasphere_node_url:
+            self.client = ollama.Client(host=datasphere_node_url)
+            self.model_name = 'from_yandex_node'
+            print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
             self.model_name = model
             try:
@@ -853,12 +862,12 @@ class DeepSeekAnalyzer:
 class JSONCallAnalyticsMCP:
     """Главная MCP система для работы с Google Drive JSON файлами"""
 
-    def __init__(self, json_directory: str, model: Union[str, Llama], drive_path: str = None):
+    def __init__(self, json_directory: str, model: Union[str, Llama], node_url=None, drive_path: str = None):
         self.drive_path = drive_path
         self.data_loader = DriveDataLoader(json_directory, drive_path)
-        self.planner = DeepSeekPlanner(model, drive_path)
+        self.planner = DeepSeekPlanner(model, node_url, drive_path)
         self.executor = JSONQueryExecutor(self.data_loader)
-        self.analyzer = DeepSeekAnalyzer(model, drive_path)
+        self.analyzer = DeepSeekAnalyzer(model, node_url, drive_path)
 
         # Загружаем данные при инициализации
         print("📂 Загружаю данные из JSON файлов...")

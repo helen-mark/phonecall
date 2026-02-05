@@ -8,7 +8,7 @@ from llama_cpp import Llama
 
 
 class JsonFileTaggingAgent:
-    def __init__(self, model: Union[str, Llama], tags_list: List[str] = None):
+    def __init__(self, model: Union[str, Llama], node_url=None, tags_list: List[str] = None):
         """
         Инициализация агента для тегирования звонков
 
@@ -21,6 +21,9 @@ class JsonFileTaggingAgent:
         if self.is_local:
             self.model_name = 'local'
             self.model = model
+        elif node_url:
+            self.client = ollama.Client(host=node_url)
+            self.model_name = 'from_yandex_node'
         else:
             self.client = ollama.Client()
             self.model_name = model

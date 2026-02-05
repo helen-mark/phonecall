@@ -14,7 +14,7 @@ from llama_cpp import Llama
 
 class SmartAudioProcessor:
 
-    def __init__(self, model, drive_audio_path, output_csv_path,
+    def __init__(self, model, node_url, drive_audio_path, output_csv_path,
                  total_space_gb=80, batch_size_gb=2):
 
         my_tags = [
@@ -52,6 +52,7 @@ class SmartAudioProcessor:
 
         self.tagger = JsonFileTaggingAgent(
             model=model,
+            node_url=node_url,
             tags_list=my_tags
         )
 
