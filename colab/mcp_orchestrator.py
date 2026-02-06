@@ -11,7 +11,7 @@ from contextlib import contextmanager
 import pandas as pd
 from typing import Union
 import ollama
-from llama_cpp import Llama
+#from llama_cpp import Llama
 
 
 # ==================== Структуры данных ====================
@@ -329,7 +329,7 @@ class DeepSeekPlanner:
     """LLM планировщик запросов"""
 
     def __init__(self, model, datasphere_node_url=None, drive_path=None):
-        self.is_local = isinstance(model, Llama)
+        self.is_local = False  #isinstance(model, Llama)
 
         self.drive_path = drive_path
         self.available_tags = self._load_available_tags()
@@ -737,8 +737,8 @@ class JSONQueryExecutor:
 class DeepSeekAnalyzer:
     """LLM для анализа результатов и генерации ответов"""
 
-    def __init__(self, model: Union[str, Llama], datasphere_node_url = None, drive_path: str = None):
-        self.is_local = isinstance(model, Llama)
+    def __init__(self, model, datasphere_node_url = None, drive_path: str = None):
+        self.is_local = False # isinstance(model, Llama)
 
         if self.is_local:
             self.model_name = 'local'
@@ -864,7 +864,7 @@ class DeepSeekAnalyzer:
 class JSONCallAnalyticsMCP:
     """Главная MCP система для работы с Google Drive JSON файлами"""
 
-    def __init__(self, json_directory: str, model: Union[str, Llama], node_url=None, drive_path: str = None):
+    def __init__(self, json_directory: str, model, node_url=None, drive_path: str = None):
         self.drive_path = drive_path
         self.data_loader = DriveDataLoader(json_directory, drive_path)
         self.planner = DeepSeekPlanner(model, node_url, drive_path)

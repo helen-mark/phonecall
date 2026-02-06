@@ -4,11 +4,11 @@ import re
 from typing import List, Dict, Any
 import ollama  # Или openai, если используете OpenAI API
 from typing import Union
-from llama_cpp import Llama
+#from llama_cpp import Llama
 
 
 class JsonFileTaggingAgent:
-    def __init__(self, model: Union[str, Llama], node_url=None, tags_list: List[str] = None):
+    def __init__(self, model, node_url=None, tags_list: List[str] = None):
         """
         Инициализация агента для тегирования звонков
 
@@ -17,7 +17,7 @@ class JsonFileTaggingAgent:
             tags_list: список тегов для классификации
         """
 
-        self.is_local = isinstance(model, Llama)
+        self.is_local = False #isinstance(model, Llama)
         if self.is_local:
             self.model_name = 'local'
             self.model = model
