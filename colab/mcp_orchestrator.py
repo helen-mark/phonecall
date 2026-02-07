@@ -746,7 +746,7 @@ class DeepSeekAnalyzer:
             self.model_name = 'local'
             self.model = model
         elif datasphere_node_url:
-            self.client = ollama.Client(host=datasphere_node_url)
+            self.client = ollama.Client(host=datasphere_node_url, timeout=300)
             self.model_name = 'from_yandex_node'
             print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
