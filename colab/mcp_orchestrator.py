@@ -408,45 +408,42 @@ class DeepSeekPlanner:
 
         prompt = self._build_planner_prompt(user_query)
 
-        try:
-            if self.is_local:
-                response = self.model(
-                    prompt,
-                    max_tokens=500,
-                    temperature=0.1)
-            else:
-                print('Use timeout 250')
-                response = self.client.generate(
-                    model=self.model_name,
-                    prompt=prompt,
-                    format="json",
-                    options={'temperature': 0.1, 'num_predict': 250, 'timeout': 250}
-                )
 
-            plan_data = json.loads(response['response'])
-
-            # Парсим временной период
-            time_period = self._parse_time_period(plan_data.get('time_period', {}))
-
-            # Валидируем теги
-            target_tags = self._validate_tags(plan_data.get('target_tags', []))
-
-            # Парсим метрики
-            metrics = self._parse_metrics(plan_data.get('metrics', []))
-
-            return AnalysisPlan(
-                time_period=time_period,
-                target_tags=target_tags,
-                metrics=metrics,
-                grouping=plan_data.get('grouping', 'month'),
-                comparison_tags=plan_data.get('comparison_tags', []),
-                additional_filters=plan_data.get('filters', {})
+        if self.is_local:
+            response = self.model(
+                prompt,
+                max_tokens=500,
+                temperature=0.1)
+        else:
+            print('Use timeout 250')
+            response = self.client.generate(
+                model=self.model_name,
+                prompt=prompt,
+                format="json",
+                options={'temperature': 0.1, 'num_predict': 250, 'timeout': 250}
             )
 
-        except Exception as e:
-            print(f"❌ Ошибка планировщика: {e}")
-            # Возвращаем план по умолчанию
-            return self._create_default_plan(user_query)
+        plan_data = json.loads(response['response'])
+
+        # Парсим временной период
+        time_period = self._parse_time_period(plan_data.get('time_period', {}))
+
+        # Валидируем теги
+        target_tags = self._validate_tags(plan_data.get('target_tags', []))
+
+        # Парсим метрики
+        metrics = self._parse_metrics(plan_data.get('metrics', []))
+
+        return AnalysisPlan(
+            time_period=time_period,
+            target_tags=target_tags,
+            metrics=metrics,
+            grouping=plan_data.get('grouping', 'month'),
+            comparison_tags=plan_data.get('comparison_tags', []),
+            additional_filters=plan_data.get('filters', {})
+        )
+
+
 
     def _build_planner_prompt(self, user_query: str) -> str:
         """Строит промпт для планировщика"""
