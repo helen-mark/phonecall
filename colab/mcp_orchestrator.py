@@ -496,20 +496,6 @@ class DeepSeekPlanner:
         start = today - timedelta(days=30)  # По умолчанию последний месяц
         end = today
 
-        # Определяем период на основе описания
-        if 'последние 6 месяцев' in description.lower():
-            start = today - timedelta(days=30 * 6)
-        elif 'этот месяц' in description.lower():
-            start = datetime(today.year, today.month, 1)
-        elif 'этот год' in description.lower():
-            start = datetime(today.year, 1, 1)
-        elif 'первый квартал 2024' in description.lower():
-            start = datetime(2024, 1, 1)
-            end = datetime(2024, 3, 31)
-        elif 'прошлый год' in description.lower():
-            start = datetime(today.year - 1, 1, 1)
-            end = datetime(today.year - 1, 12, 31)
-
         # Переопределяем если указаны точные даты
         if period_data.get('start'):
             try:
@@ -896,7 +882,7 @@ class JSONCallAnalyticsMCP:
         print("🤖 Создаю план анализа...")
         analysis_plan = self.planner.create_analysis_plan(user_query)
 
-        print(f"   📅 Период: {analysis_plan.time_period['description']}, {analysis_plan.time_period['start']}, {analysis_plan.time_period['description']['end']}")
+        print(f"   📅 Период: {analysis_plan.time_period['description']}, {analysis_plan.time_period['start']}, {analysis_plan.time_period['end']}")
         print(f"   🏷️  Теги: {', '.join(analysis_plan.target_tags)}")
         print(f"   📊 Метрики: {[m.value for m in analysis_plan.metrics]}")
 
