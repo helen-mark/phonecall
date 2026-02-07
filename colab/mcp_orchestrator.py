@@ -359,7 +359,7 @@ class DeepSeekPlanner:
                 os.makedirs(models_cache_dir, exist_ok=True)
                 print(f"🌐 Кэш моделей Ollama в Google Drive: {models_cache_dir}")
 
-            self.client = ollama.Client(host=host, timeout=60.0)
+            self.client = ollama.Client(host=host, timeout=300.0)
 
             # Проверяем доступность
             try:
@@ -754,7 +754,7 @@ class DeepSeekAnalyzer:
             try:
                 self.client = ollama.Client(
                     host="http://localhost:11434",
-                    timeout=90.0  # Увеличенный таймаут для больших моделей
+                    timeout=300.0  # Увеличенный таймаут для больших моделей
                 )
             except ImportError:
                 print("❌ Ollama не установлен")
