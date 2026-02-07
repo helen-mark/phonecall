@@ -338,7 +338,7 @@ class DeepSeekPlanner:
             self.model = model
             self.model_name = 'local'
         elif datasphere_node_url:
-            self.client = ollama.Client(host=datasphere_node_url)
+            self.client = ollama.Client(host=datasphere_node_url, timeout=300)
             self.model_name = 'from_yandex_node'
             print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
@@ -415,11 +415,12 @@ class DeepSeekPlanner:
                     max_tokens=500,
                     temperature=0.1)
             else:
+                print('Use timeout 250')
                 response = self.client.generate(
                     model=self.model_name,
                     prompt=prompt,
                     format="json",
-                    options={'temperature': 0.1, 'num_predict': 500}
+                    options={'temperature': 0.1, 'num_predict': 250, 'timeout': 250}
                 )
 
             plan_data = json.loads(response['response'])
@@ -485,7 +486,8 @@ class DeepSeekPlanner:
   "grouping": "month/week/day"
   }}
 
-Ответ:"""
+Ответ:
+<|think|>false<|end|>"""
 
     def _parse_time_period(self, period_data: Dict) -> Dict[str, Any]:
         """Парсит временной период"""
@@ -495,6 +497,20 @@ class DeepSeekPlanner:
         # Начальные значения
         start = today - timedelta(days=30)  # По умолчанию последний месяц
         end = today
+
+        # Определяем период на основе описания
+        if 'последние 6 месяцев' in description.lower():
+            start = today - timedelta(days=30 * 6)
+        elif 'этот месяц' in description.lower():
+            start = datetime(today.year, today.month, 1)
+        elif 'этот год' in description.lower():
+            start = datetime(today.year, 1, 1)
+        elif 'первый квартал 2024' in description.lower():
+            start = datetime(2024, 1, 1)
+            end = datetime(2024, 3, 31)
+        elif 'прошлый год' in description.lower():
+            start = datetime(today.year - 1, 1, 1)
+            end = datetime(today.year - 1, 12, 31)
 
         # Переопределяем если указаны точные даты
         if period_data.get('start'):
