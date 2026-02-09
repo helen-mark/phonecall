@@ -58,6 +58,8 @@ class DriveDataLoader:
         self.calls_cache = None
         self.conn = None
         self._check_drive_access()
+        self.timeout=600
+        print(f"data loader timeout {self.timeout}")
 
     def _check_drive_access(self):
         """Проверяет доступ к Google Drive"""
@@ -333,12 +335,14 @@ class DeepSeekPlanner:
 
         self.drive_path = drive_path
         self.available_tags = self._load_available_tags()
+        self.timeout = 600
+        print(f"deep seek planner timeout {self.timeout}")
 
         if self.is_local:
             self.model = model
             self.model_name = 'local'
         elif datasphere_node_url:
-            self.client = ollama.Client(host=datasphere_node_url, timeout=300)
+            self.client = ollama.Client(host=datasphere_node_url, timeout=self.timeout)
             self.model_name = 'from_yandex_node'
             print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
@@ -349,6 +353,7 @@ class DeepSeekPlanner:
 
     def _setup_ollama_client(self):
         """Настраивает клиент Ollama с учетом Google Drive"""
+        print("setup_version_1.0")
         try:
             # Настройка для Colab
             host = "http://localhost:11434"
@@ -359,7 +364,7 @@ class DeepSeekPlanner:
                 os.makedirs(models_cache_dir, exist_ok=True)
                 print(f"🌐 Кэш моделей Ollama в Google Drive: {models_cache_dir}")
 
-            self.client = ollama.Client(host=host, timeout=300.0)
+            self.client = ollama.Client(host=host, timeout=self.timeout)
 
             # Проверяем доступность
             try:
@@ -409,21 +414,27 @@ class DeepSeekPlanner:
         prompt = self._build_planner_prompt(user_query)
 
 
+        print("DEBUG:")
+        print(f"{prompt}")
         if self.is_local:
             response = self.model(
                 prompt,
                 max_tokens=500,
                 temperature=0.1)
         else:
-            print('Use timeout 250')
+            print(f'Use timeout {self.timeout}')
             response = self.client.generate(
                 model=self.model_name,
                 prompt=prompt,
                 format="json",
-                options={'temperature': 0.1, 'num_predict': 250, 'timeout': 250}
+                options={'temperature': 0.1, 'num_predict': 250, 'timeout': self.timeout}
             )
-
-        plan_data = json.loads(response['response'])
+        try:
+            plan_data = json.loads(response['response'])
+        except:
+            print("Модель дура и вернула фигню:")
+            print(response['response'])
+            raise
 
         # Парсим временной период
         time_period = self._parse_time_period(plan_data.get('time_period', {}))
@@ -451,6 +462,8 @@ class DeepSeekPlanner:
 
         # Добавляем информацию о источнике данных
         data_source = "Google Drive" if self.drive_path else "локальной базы данных"
+        
+        tags = ', '.join(self.available_tags)
 
         return f"""Ты — аналитик базы телефонных звонков компании по аренде ковров.
 
@@ -462,7 +475,7 @@ class DeepSeekPlanner:
 Система будет обращаться по твоему плану к текстам с записями телефонных звонков клиентов за несколько последних лет, содержащими описательные теги каждого звонка.
 
 ДОСТУПНЫЕ ТЕГИ:
-{', '.join(self.available_tags)}
+{tags}
 
 МЕТРИКИ, которые система может посчитать для тебя для ответа на запрос, если это необходимо:
 1. count_by_tag - подсчет звонков с заданным тегом за период
@@ -484,7 +497,7 @@ class DeepSeekPlanner:
   }}
 
 Ответ:
-<|think|>false<|end|>"""
+"""
 
     def _parse_time_period(self, period_data: Dict) -> Dict[str, Any]:
         """Парсит временной период"""
@@ -738,12 +751,14 @@ class DeepSeekAnalyzer:
 
     def __init__(self, model, datasphere_node_url = None, drive_path: str = None):
         self.is_local = False # isinstance(model, Llama)
+        self.timeout = 600
+        print(f"deep seek analizer timeout {self.timeout}")
 
         if self.is_local:
             self.model_name = 'local'
             self.model = model
         elif datasphere_node_url:
-            self.client = ollama.Client(host=datasphere_node_url, timeout=300)
+            self.client = ollama.Client(host=datasphere_node_url, timeout=self.timeout)
             self.model_name = 'from_yandex_node'
             print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
@@ -751,7 +766,7 @@ class DeepSeekAnalyzer:
             try:
                 self.client = ollama.Client(
                     host="http://localhost:11434",
-                    timeout=300.0  # Увеличенный таймаут для больших моделей
+                    timeout=self.timeout  # Увеличенный таймаут для больших моделей
                 )
             except ImportError:
                 print("❌ Ollama не установлен")
@@ -765,6 +780,8 @@ class DeepSeekAnalyzer:
         """Генерирует итоговый ответ на основе результатов"""
 
         prompt = self._build_analyzer_prompt(user_query, results, plan)
+        
+        print(f"DEBUG analyzer_prompt: {prompt}")
 
         try:
             if self.is_local:

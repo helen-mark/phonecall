@@ -3,7 +3,10 @@ import os
 from datetime import datetime
 import ollama
 from pathlib import Path
-from phonecall.colab.mcp_orchestrator import JSONCallAnalyticsMCP
+from phonecall.colab.reload_recursive import reload_recursive
+
+reload_recursive(phonecall.colab.mcp_orchestrator)
+import phonecall.colab.mcp_orchestrator
 from typing import Union
 #from llama_cpp import Llama
 
@@ -186,7 +189,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
 
     print("""
 ╔══════════════════════════════════════════╗
-║      АНАЛИТИК ЗВОНКОВ v3.0               ║
+║      АНАЛИТИК ЗВОНКОВ v3.1               ║
 ║      Google Drive Edition                ║
 ╚══════════════════════════════════════════╝
     """)
@@ -220,7 +223,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
     # Создаем директорию для результатов
     os.makedirs(RESULTS_DIRECTORY, exist_ok=True)
 
-    system = JSONCallAnalyticsMCP(JSON_DIRECTORY, _model, node_url, drive_path)
+    system = phonecall.colab.mcp_orchestrator.JSONCallAnalyticsMCP(JSON_DIRECTORY, _model, node_url, drive_path)
 
     # История запросов
     query_history = []
