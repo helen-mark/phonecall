@@ -414,8 +414,8 @@ class DeepSeekPlanner:
         prompt = self._build_planner_prompt(user_query)
 
 
-        print("DEBUG:")
-        print(f"{prompt}")
+        # print("DEBUG:")
+        # print(f"{prompt}")
         if self.is_local:
             response = self.model(
                 prompt,
@@ -427,7 +427,7 @@ class DeepSeekPlanner:
                 model=self.model_name,
                 prompt=prompt,
                 format="json",
-                options={'temperature': 0.1, 'num_predict': 250, 'timeout': self.timeout}
+                options={'temperature': 0.1, 'timeout': self.timeout}
             )
         try:
             plan_data = json.loads(response['response'])
@@ -781,18 +781,17 @@ class DeepSeekAnalyzer:
 
         prompt = self._build_analyzer_prompt(user_query, results, plan)
         
-        print(f"DEBUG analyzer_prompt: {prompt}")
+        #print(f"DEBUG analyzer_prompt: {prompt}")
 
         try:
             if self.is_local:
                 response = self.model(prompt,
-                                      temperature=0.3,
-                                      num_predict=1000)
+                                      temperature=0.3)
             else:
                 response = self.client.generate(
                     model=self.model_name,
                     prompt=prompt,
-                    options={'temperature': 0.3, 'num_predict': 1000}
+                    options={'temperature': 0.3}
                 )
 
             return response['response'].strip()

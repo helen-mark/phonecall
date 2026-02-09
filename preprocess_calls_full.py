@@ -4,6 +4,7 @@ import librosa
 import numpy as np
 import pandas as pd
 import whisper
+import soundfile as sf
 from datetime import datetime
 from pydub import AudioSegment
 import warnings
@@ -13,13 +14,12 @@ warnings.filterwarnings('ignore')
 
 class AudioProcessor:
     def __init__(self, model_size):
-        """
-        Инициализация процессора аудио
-        model_size: "tiny", "base", "small", "medium", "large"
-        """
-        print("Загрузка модели Whisper...")
-        self.asr_model = whisper.load_model(model_size)
-        print("Модель загружена!")
+        if not hasattr(self, 'asr_model') or self.asr_model is None:timeo
+            print("Загрузка модели Whisper...")
+            self.asr_model = whisper.load_model(model_size)
+            print("Модель загружена!")
+        else:
+            print("Модель уже загружена, повторная загрузка не требуется")
 
     def extract_date_from_filename(self, filename):
         """
@@ -38,8 +38,32 @@ class AudioProcessor:
             return datetime.now().strftime('%Y-%m-%d')
         except:
             return datetime.now().strftime('%Y-%m-%d')
-
+        
+        
     def convert_to_16k(self, audio_path, output_path=None):
+
+        if output_path is None:
+            base_name = os.path.splitext(audio_path)[0]
+            output_path = f"{base_name}_16k.wav"
+
+        # Загружаем аудио
+        y, sr = librosa.load(audio_path, sr=None)
+
+        if sr == 16000:
+            print(f"✅ Файл уже имеет частоту 16 кГц: {audio_path}")
+            return audio_path
+        else:
+            print(f"🔄 Конвертируем! {audio_path} из {sr} Hz в 16000 Hz...")
+
+            # Ресемплируем до 16 кГц
+            y_16k = librosa.resample(y, orig_sr=sr, target_sr=16000)
+
+            # Сохраняем как WAV файл
+            sf.write(output_path, y_16k, 16000, subtype='PCM_16')
+
+            return output_path
+
+    def convert_to_16k_ffprobe(self, audio_path, output_path=None):
         """
         Конвертация аудио в 16 кГц моно WAV
         """
@@ -144,10 +168,11 @@ class AudioProcessor:
 
         # Конвертируем в 16 кГц
         converted_path = self.convert_to_16k(audio_path)
+        print('Converted')
 
-        # Оцениваем качество
+        print('Quality estimation...')
         quality_score = self.assess_quality(converted_path)
-        print(f"Оценка качества: {quality_score}/10")
+        print(f"Estimated quality: {quality_score}/10")
 
         # Определяем, нужно ли транскрибировать
         text = ""

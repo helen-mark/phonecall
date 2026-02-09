@@ -53,14 +53,13 @@ def get_audio_info(file_path):
 
 
 class AudioAnalyzer:
-    def __init__(self, model_size):
-        """
-        Инициализация анализатора аудио
-        model_size: "tiny", "base", "small", "medium", "large"
-        """
+def __init__(self, model_size):
+    if not hasattr(self, 'asr_model') or self.asr_model is None:
         print("Загрузка модели Whisper...")
         self.asr_model = whisper.load_model(model_size)
         print("Модель загружена!")
+    else:
+        print("Модель уже загружена, повторная загрузка не требуется")
 
     def extract_audio_features(self, audio_path):
         """

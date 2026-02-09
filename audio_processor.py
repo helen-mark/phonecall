@@ -11,10 +11,15 @@ from assign_tags_from_fixed_list import JsonFileTaggingAgent
 from typing import Union
 #from llama_cpp import Llama
 
+import phonecall
+import phonecall.preprocess_calls_full
+from phonecall.colab.reload_recursive import reload_recursive
+
+reload_recursive(phonecall.preprocess_calls_full)
 
 class SmartAudioProcessor:
 
-    def __init__(self, model, node_url, drive_audio_path, output_csv_path,
+    def __init__(self, model, node_url, base_path, drive_audio_path, output_csv_path,
                  total_space_gb=80, batch_size_gb=2):
 
         my_tags = [
@@ -43,28 +48,31 @@ class SmartAudioProcessor:
             "приостановить_услуги",
             "ошибка_в_документах"
         ]
+        self.base_path = base_path
         self.drive_audio_path = drive_audio_path
         self.output_csv_path = output_csv_path
         self.total_space = total_space_gb
         self.batch_size = batch_size_gb
-
-        self.ap = AudioProcessor(model_size='large')
 
         self.tagger = JsonFileTaggingAgent(
             model=model,
             node_url=node_url,
             tags_list=my_tags
         )
-
-        self.local_temp_dir = "/content/temp_audio"
-        self.local_whisper_dir = "/content/whisper_output"
-        self.local_batch_dir = "/content/current_batch"
+        print(f'base path: {self.base_path}')
+        self.local_temp_dir = os.path.join(self.base_path, "temp_audio")
+        self.local_whisper_dir = os.path.join(self.base_path, "whisper_output")
+        self.local_batch_dir = os.path.join(self.base_path, "current_batch")
 
         # Create local dirs:
         for dir_path in [self.local_temp_dir, self.local_whisper_dir, self.local_batch_dir]:
+            print(dir_path)
             os.makedirs(dir_path, exist_ok=True)
 
-        self.processed_files_log = "/content/drive/MyDrive/MCP_Call_Analytics/processed_files.json"
+        self.processed_files_log = os.path.join(self.base_path, "processed_files.json")
+        
+        self.ap = AudioProcessor(model_size='large')
+
 
         print(f" Initializing SmartAudioProcessor")
         print(f" Audiofiles: {drive_audio_path}")
@@ -104,7 +112,7 @@ class SmartAudioProcessor:
 
         if not to_process:
             print("\n All files are processed!")
-        return []
+            return []
 
         # 3. Process bathces
         batches = self._create_batches(to_process)
@@ -424,7 +432,7 @@ class SmartAudioProcessor:
             try:
                 total_bytes += os.path.getsize(file_path)
             except:
-                total_bytes += 50 * 1024 * 1024  # 50 MB
+                total_bytes += 50 * 1024 * 1024  # 50 MB'
 
         return total_bytes / (1024 ** 3)
 
@@ -440,6 +448,7 @@ class SmartAudioProcessor:
         batches = []
         current_batch = []
         current_batch_size = 0
+        print('Creating batches...')
 
         for file_path in file_paths:
             file_size_gb = self._get_file_size_gb(file_path)
@@ -448,9 +457,12 @@ class SmartAudioProcessor:
                 batches.append(current_batch.copy())
                 current_batch = []
                 current_batch_size = 0
+                print('new batch created')
+                
 
             current_batch.append(file_path)
             current_batch_size += file_size_gb
+            print('append file to batch')
 
         if current_batch:
             batches.append(current_batch)

@@ -4,9 +4,9 @@ from datetime import datetime
 import ollama
 from pathlib import Path
 from phonecall.colab.reload_recursive import reload_recursive
+import phonecall.colab.mcp_orchestrator
 
 reload_recursive(phonecall.colab.mcp_orchestrator)
-import phonecall.colab.mcp_orchestrator
 from typing import Union
 #from llama_cpp import Llama
 
