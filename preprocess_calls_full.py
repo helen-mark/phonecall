@@ -8,18 +8,30 @@ import soundfile as sf
 from datetime import datetime
 from pydub import AudioSegment
 import warnings
+import ffmpeg
 
 warnings.filterwarnings('ignore')
 
 
 class AudioProcessor:
+    _loaded_models = {}
+    
     def __init__(self, model_size):
-        if not hasattr(self, 'asr_model') or self.asr_model is None:timeo
-            print("Загрузка модели Whisper...")
-            self.asr_model = whisper.load_model(model_size)
-            print("Модель загружена!")
+        """
+        Инициализация анализатора аудио
+        model_size: "tiny", "base", "small", "medium", "large"
+        """
+        self.model_size = model_size
+        
+        # Проверяем, загружена ли уже модель этого размера
+        if model_size not in self._loaded_models:
+            print(f"Загрузка модели Whisper {model_size}...")
+            self._loaded_models[model_size] = whisper.load_model(model_size)
+            print(f"✅ Модель {model_size} загружена!")
         else:
-            print("Модель уже загружена, повторная загрузка не требуется")
+            print(f"✅ Используем уже загруженную модель {model_size}")
+        
+        self.asr_model = self._loaded_models[model_size]
 
     def extract_date_from_filename(self, filename):
         """

@@ -17,7 +17,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
     def show_help(in_drive_mode: bool):
         """Показывает справку по командам"""
         help_text = """
-    📖 КОМАНДЫ:
+     КОМАНДЫ:
 
     АНАЛИТИЧЕСКИЕ ЗАПРОСЫ:
       Просто введите ваш вопрос, например:
@@ -39,7 +39,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
 
         if in_drive_mode:
             help_text += """
-    🚀 GOOGLE DRIVE КОМАНДЫ:
+    GOOGLE DRIVE КОМАНДЫ:
       • Все данные автоматически сохраняются в Drive
       • Результаты доступны в папке saved_results/
       • Модели кэшируются для ускорения работы
@@ -52,38 +52,36 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
         print(help_text)
 
     def show_system_stats(system, in_drive_mode: bool):
-        """Показывает статистику системы"""
         info = system.get_system_info()
 
-        print("\n📊 СТАТИСТИКА СИСТЕМЫ:")
+        print("\n СТАТИСТИКА СИСТЕМЫ:")
         print("-" * 40)
 
         if in_drive_mode:
-            print("📍 Режим: Google Drive")
+            print(" Режим: Google Drive")
             print("-" * 40)
 
-        print(f"📞 Всего звонков: {info['total_calls']}")
-        print(f"🏷️  Уникальных тегов: {info['unique_tags_count']}")
+        print(f" Всего звонков: {info['total_calls']}")
+        print(f"  Уникальных тегов: {info['unique_tags_count']}")
 
         if info['date_range']['start']:
             start_date = datetime.fromisoformat(info['date_range']['start']).strftime('%d.%m.%Y')
             end_date = datetime.fromisoformat(info['date_range']['end']).strftime('%d.%m.%Y')
-            print(f"📅 Период данных: {start_date} - {end_date}")
+            print(f" Период данных: {start_date} - {end_date}")
 
-        print(f"📝 Средняя длина текста: {info['average_text_length']} симв.")
-        print(f"🤖 Модель: {info['model']}")
-        print(f"📁 Источник: {info['data_source']}")
+        print(f" Средняя длина текста: {info['average_text_length']} симв.")
+        print(f" Модель: {info['model']}")
+        print(f" Источник: {info['data_source']}")
 
         if 'drive_path' in info and info['drive_path']:
-            print(f"🚀 Google Drive путь: {info['drive_path']}")
+            print(f" Google Drive путь: {info['drive_path']}")
 
     def show_query_history(history):
-        """Показывает историю запросов"""
         if not history:
-            print("📭 История запросов пуста")
+            print(" История запросов пуста")
             return
 
-        print("\n🕐 ИСТОРИЯ ЗАПРОСОВ:")
+        print("\n ИСТОРИЯ ЗАПРОСОВ:")
         print("-" * 60)
 
         # Показываем последние 10 запросов
@@ -175,7 +173,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
             print("   Директория не существует")
 
         # Показываем результаты
-        print(f"\n💾 Результаты ({results_dir}):")
+        print(f"\n Результаты ({results_dir}):")
         if os.path.exists(results_dir):
             result_files = os.listdir(results_dir)
             print(f"   Файлов результатов: {len(result_files)}")
@@ -210,7 +208,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
         print(f"❌ Директория {JSON_DIRECTORY} не найдена!")
 
         if IN_DRIVE_MODE:
-            print(f"\n📝 Для загрузки файлов в Google Drive:")
+            print(f"\n Для загрузки файлов в Google Drive:")
             print(f"1. Откройте {drive_path} в браузере")
             print(f"2. Создайте папку 'csv_calls'")
             print(f"3. Загрузите туда файл")
@@ -238,9 +236,9 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
 
             # Обработка команд
             if user_input.lower() in ['/выход', '/exit', 'выход', 'exit', '/q', 'q']:
-                print("👋 До свидания!")
+                print(" До свидания!")
                 if IN_DRIVE_MODE:
-                    print("💾 Все данные сохранены в Google Drive")
+                    print(" Все данные сохранены.")
                 break
 
             elif user_input.lower() in ['/?', '/помощь', '/help']:
@@ -299,7 +297,7 @@ def enhanced_interactive_mode(_model, node_url = None, csv_dir: str = None, resu
 
             # Обрабатываем запрос
             start_time = datetime.now()
-            result = system.process_query(user_input)
+            result = system.process_query(user_input, query_history)
             processing_time = (datetime.now() - start_time).total_seconds()
 
             # Обновляем историю

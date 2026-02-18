@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 import subprocess
 from preprocess_calls_full import AudioProcessor
+import assign_tags_from_fixed_list
 from assign_tags_from_fixed_list import JsonFileTaggingAgent
 from typing import Union
 #from llama_cpp import Llama
@@ -16,38 +17,16 @@ import phonecall.preprocess_calls_full
 from phonecall.colab.reload_recursive import reload_recursive
 
 reload_recursive(phonecall.preprocess_calls_full)
+reload_recursive(assign_tags_from_fixed_list)
+
 
 class SmartAudioProcessor:
 
     def __init__(self, model, node_url, base_path, drive_audio_path, output_csv_path,
-                 total_space_gb=80, batch_size_gb=2):
-
-        my_tags = [
-            "низкое_качество_стирки_или_чистки",
-            "не_заменили_ковры_вовремя",
-            "клиент_хочет_добавить_ковры",
-            "клиент_хочет_меньше_ковров",
-            "погашение_долга",
-            "расторжение_договора",
-            "возобновление_услуг",
-            "долго_нет_ответа_на_заявку",
-            "лишняя_доставка",
-            "доставили_не_те_ковры",
-            "не_выставлен_вовремя_счет",
-            "неверная_сумма_в_счете",
-            "ковер_забрали_без_причины",
-            "забрали_не_тот_ковер",
-            "менеджер_нагрубил_клиенту",
-            "неоправданно_высокие_цены",
-            "неоправданный_рост_цен",
-            "новый_клиент_заключение_договора",
-            "консультация_или_уточнение_деталей",
-            "поменять_спецификации",
-            "менеджер_обещал_но_не_связался_с_клиентом",
-            "клиент_уходит_к_конкурентам",
-            "приостановить_услуги",
-            "ошибка_в_документах"
-        ]
+                 total_space_gb=80, batch_size_gb=2, config_path='config.yml'):
+        with open(config_path, 'r', encoding='utf-8') as file:
+            config = yaml.safe_load(file)
+        my_tags = config.get('tags_list', [])
         self.base_path = base_path
         self.drive_audio_path = drive_audio_path
         self.output_csv_path = output_csv_path
@@ -108,7 +87,6 @@ class SmartAudioProcessor:
         print(f"\n Processing status:")
         print(f" Already processed: {len(processed):,} files")
         print(f" To process: {len(to_process):,} files")
-        print(f" Progress: {len(processed) / total_files * 100:.1f}%")
 
         if not to_process:
             print("\n All files are processed!")
@@ -116,7 +94,7 @@ class SmartAudioProcessor:
 
         # 3. Process bathces
         batches = self._create_batches(to_process)
-        print(f"\n📦 Создано {len(batches)} батчей для обработки")
+        print(f"\n Создано {len(batches)} батчей для обработки")
 
         all_results = []
         start_time = time.time()
@@ -211,13 +189,13 @@ class SmartAudioProcessor:
                 duplicates = df.duplicated(subset=['source_audio'], keep='last').sum()
 
                 if duplicates > 0:
-                    print(f"🔍 Найдено {duplicates} дубликатов, удаляю...")
+                    print(f"Найдено {duplicates} дубликатов, удаляю...")
 
                     df_clean = df.drop_duplicates(subset=['source_audio'], keep='last')
                     df_clean.to_csv(self.output_csv_path, index=False, encoding='utf-8')
 
-                    print(f"🧹 Удалено {duplicates} дубликатов")
-                    print(f"📊 Осталось {len(df_clean)} уникальных записей")
+                    print(f" Удалено {duplicates} дубликатов")
+                    print(f" Осталось {len(df_clean)} уникальных записей")
             else:
                 print("⚠️  Колонка 'source_audio' не найдена в CSV")
 
@@ -225,17 +203,15 @@ class SmartAudioProcessor:
             print(f"⚠️  Ошибка при удалении дубликатов: {e}")
 
     def _load_processed_list(self):
-        """Загружает список уже обработанных файлов"""
         processed_files = set()
 
-        # 1. Проверяем основной CSV файл с результатами
         if os.path.exists(self.output_csv_path):
             try:
                 df = pd.read_csv(self.output_csv_path)
                 if 'source_audio' in df.columns:
                     csv_processed = set(df['source_audio'].dropna().unique())
                     processed_files.update(csv_processed)
-                    print(f"📊 Из основного CSV загружено: {len(csv_processed)} файлов")
+                    print(f"Из основного CSV загружено: {len(csv_processed)} файлов")
             except Exception as e:
                 print(f"⚠️  Ошибка чтения основного CSV: {e}")
 
@@ -251,7 +227,6 @@ class SmartAudioProcessor:
         #     except Exception as e:
         #         print(f"⚠️  Ошибка чтения лога: {e}")
 
-        # Преобразуем в полные пути для сравнения
         full_paths_processed = set()
         for filename in processed_files:
             full_path = os.path.join(self.drive_audio_path, filename)
@@ -279,7 +254,7 @@ class SmartAudioProcessor:
             with open(self.processed_files_log, 'w') as f:
                 json.dump(current_processed, f)
 
-            print(f"📝 Лог обновлен: +{len(new_processed)} файлов, всего {len(current_processed)}")
+            print(f"Лог обновлен: +{len(new_processed)} файлов, всего {len(current_processed)}")
 
         except Exception as e:
             print(f"⚠️  Ошибка обновления лога: {e}")
@@ -293,7 +268,7 @@ class SmartAudioProcessor:
 
         # 2. Скачиваем файлы батча в локальную ФС
         local_files = []
-        print(f"📥 Скачиваю {len(batch_files)} файлов в локальную ФС...")
+        print(f"Скачиваю {len(batch_files)} файлов в локальную ФС...")
 
         for file_path in batch_files:
             try:
@@ -307,28 +282,27 @@ class SmartAudioProcessor:
                 # Проверяем, что файл скопировался
                 if os.path.exists(local_path):
                     size_mb = os.path.getsize(local_path) / (1024 * 1024)
-                    print(f"  ✅ {filename} ({size_mb:.1f} MB)")
-                else:
-                    print(f"  ❌ {filename} - не скопировался")
+                    print(f"  {filename} ({size_mb:.1f} MB)")
+                else: 
+                    print(f"   {filename} - не скопировался")
 
             except Exception as e:
-                print(f"  ❌ Ошибка копирования {os.path.basename(file_path)}: {e}")
+                print(f"   Ошибка копирования {os.path.basename(file_path)}: {e}")
 
-        print(f"📊 Скачано: {len(local_files)}/{len(batch_files)} файлов")
+        print(f" Скачано: {len(local_files)}/{len(batch_files)} файлов")
 
         if not local_files:
             print("⚠️  Нет файлов для обработки в этом батче")
             return []
 
-        # 3. Обрабатываем каждый локальный файл
-        print("\n🔊 Начинаю обработку аудио...")
+        print("\n Начинаю обработку аудио...")
 
         for i, local_file in enumerate(local_files, 1):
             try:
                 print(f"\n[{i}/{len(local_files)}] Обрабатываю: {os.path.basename(local_file)}")
 
                 # 3.1 Whisper: Аудио → Текст
-                print("  📝 Шаг 1: Конвертация аудио в текст...")
+                print("   Шаг 1: Конвертация аудио в текст...")
                 whisper_result = self._run_whisper_locally(local_file)
 
                 if not whisper_result or 'text' not in whisper_result:
@@ -336,16 +310,16 @@ class SmartAudioProcessor:
                     continue
 
                 text = whisper_result['text']
-                print(f"  ✅ Текст извлечен ({len(text)} символов)")
+                print(f"  Текст извлечен ({len(text)} символов)")
 
                 # 3.2 LLM: Текст → Теги
-                print("  🏷️  Шаг 2: Тегирование текста...")
+                print("    Шаг 2: Тегирование текста...")
                 tagging_result = self._run_tagging_locally(text)
 
                 tags = tagging_result.get('result', [])
                 summary = tagging_result.get('summary', '')
 
-                print(f"  ✅ Добавлено тегов: {len(tags)}")
+                print(f"  Добавлено тегов: {len(tags)}")
 
                 # 3.3 Создаем результат
                 result = {
@@ -370,17 +344,17 @@ class SmartAudioProcessor:
 
                 # 3.4 Удаляем обработанный локальный файл
                 os.remove(local_file)
-                print(f"  🧹 Локальный файл удален")
+                print(f"   Локальный файл удален")
 
             except Exception as e:
-                print(f"  ❌ Ошибка обработки файла: {e}")
+                print(f"   Ошибка обработки файла: {e}")
                 import traceback
                 traceback.print_exc()
 
         # 4. Очищаем временные файлы
         self._cleanup_local_dirs()
 
-        print(f"\n✅ Батч {batch_num} обработан: {len(batch_results)}/{len(batch_files)} успешно")
+        print(f"\n Батч {batch_num} обработан: {len(batch_results)}/{len(batch_files)} успешно")
 
         return batch_results
 
@@ -389,7 +363,7 @@ class SmartAudioProcessor:
         try:
             return self.ap.process_file(local_audio_path, 7, False)
         except Exception as e:
-            print(f"❌ Ошибка Whisper: {e}")
+            print(f" Ошибка Whisper: {e}")
             return {'text': '', 'error': str(e)}
 
     def _run_tagging_locally(self, text):
@@ -397,14 +371,14 @@ class SmartAudioProcessor:
         try:
             return self.tagger.get_tags_from_llm(text)
         except Exception as e:
-            print(f"❌ Ошибка тегирования: {e}")
+            print(f" Ошибка тегирования: {e}")
             return {'result': [], 'summary': f'Ошибка: {str(e)}'}
 
     # ========== Auxiliary methods ==========
 
     def _list_files_without_download(self):
         if not os.path.exists(self.drive_audio_path):
-            print(f"❌ Папка не найдена: {self.drive_audio_path}")
+            print(f" Папка не найдена: {self.drive_audio_path}")
             return []
 
         audio_extensions = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma']
@@ -421,7 +395,7 @@ class SmartAudioProcessor:
 
         all_files.sort()
 
-        print(f"🔍 Найдено {len(all_files)} аудиофайлов")
+        print(f" Найдено {len(all_files)} аудиофайлов")
         return all_files
 
     def _estimate_total_size_gb(self, file_paths):
@@ -457,12 +431,10 @@ class SmartAudioProcessor:
                 batches.append(current_batch.copy())
                 current_batch = []
                 current_batch_size = 0
-                print('new batch created')
                 
 
             current_batch.append(file_path)
             current_batch_size += file_size_gb
-            print('append file to batch')
 
         if current_batch:
             batches.append(current_batch)
@@ -495,12 +467,11 @@ class SmartAudioProcessor:
         if current_batch:
             optimized.append(current_batch)
 
-        print(f"🔧 Оптимизировано: {len(batches)} → {len(optimized)} батчей")
+        print(f" Оптимизировано: {len(batches)} → {len(optimized)} батчей")
 
         return optimized
 
     def _cleanup_local_dirs(self):
-        """Очищает локальные директории"""
         for dir_path in [self.local_temp_dir, self.local_whisper_dir, self.local_batch_dir]:
             if os.path.exists(dir_path):
                 for file in os.listdir(dir_path):
@@ -509,15 +480,13 @@ class SmartAudioProcessor:
                     except:
                         pass
 
-        print("🧹 Локальные директории очищены")
+        print(" Локальные директории очищены")
 
     def get_processing_stats(self):
-        """Возвращает статистику обработки"""
         stats = {
             'total_files': 0,
             'processed_files': 0,
             'remaining_files': 0,
-            'progress_percent': 0,
             'estimated_size_gb': 0,
             'last_processed': None
         }
@@ -529,10 +498,8 @@ class SmartAudioProcessor:
 
             processed = self._load_processed_list()
             stats['processed_files'] = len(processed)
-            stats['remaining_files'] = stats['total_files'] - stats['processed_files']
+            stats['remaining_files'] = len([f for f in all_files if f not in processed])
 
-            if stats['total_files'] > 0:
-                stats['progress_percent'] = (stats['processed_files'] / stats['total_files']) * 100
 
             if os.path.exists(self.output_csv_path):
                 mod_time = os.path.getmtime(self.output_csv_path)
@@ -548,7 +515,7 @@ def main():
     DRIVE_AUDIO_PATH = "/content/drive/MyDrive/MCP_Call_Analytics/audio_raw"
     OUTPUT_CSV_PATH = "/content/drive/MyDrive/MCP_Call_Analytics/csv_calls/calls.csv"
 
-    print("🤖 SMART AUDIO PROCESSOR - ЗАПУСК")
+    print(" SMART AUDIO PROCESSOR - ЗАПУСК")
     print("=" * 50)
 
     # Инициализация процессора
@@ -565,7 +532,6 @@ def main():
     print(f"Всего файлов: {stats['total_files']:,}")
     print(f"Обработано: {stats['processed_files']:,}")
     print(f"Осталось: {stats['remaining_files']:,}")
-    print(f"Прогресс: {stats['progress_percent']:.1f}%")
     print(f"Общий объем: {stats['estimated_size_gb']:.1f} GB")
 
     if stats['last_processed']:

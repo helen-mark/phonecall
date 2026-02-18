@@ -14,10 +14,9 @@ import ollama
 #from llama_cpp import Llama
 
 
-# ==================== Структуры данных ====================
+# ==================== Data structures ====================
 
 class MetricType(Enum):
-    """Типы метрик для анализа"""
     COUNT_BY_TAG = "count_by_tag"
     TOP_N_TAGS = "top_n_tags"
     TAG_TRENDS = "tag_trends"
@@ -27,7 +26,6 @@ class MetricType(Enum):
 
 @dataclass
 class AnalysisPlan:
-    """План анализа от LLM"""
     time_period: Dict[str, Any]  # start, end, description
     target_tags: List[str]
     metrics: List[MetricType]
@@ -36,7 +34,6 @@ class AnalysisPlan:
     additional_filters: Dict = None
 
     def to_dict(self):
-        """Конвертирует в словарь для JSON"""
         return {
             'time_period': self.time_period,
             'target_tags': self.target_tags,
@@ -50,7 +47,6 @@ class AnalysisPlan:
 # ==================== Google Drive Data Loader ====================
 
 class DriveDataLoader:
-    """Загружает и управляет данными из Google Drive JSON файлов"""
 
     def __init__(self, json_directory: str, drive_path: str = None):
         self.csv_dir = json_directory
@@ -62,14 +58,13 @@ class DriveDataLoader:
         print(f"data loader timeout {self.timeout}")
 
     def _check_drive_access(self):
-        """Проверяет доступ к Google Drive"""
         if self.drive_path and 'drive' in self.csv_dir:
-            print(f"🌐 Использую Google Drive: {self.csv_dir}")
+            print(f" Использую Google Drive: {self.csv_dir}")
 
             # Проверяем существование директории
             if not os.path.exists(self.csv_dir):
-                print(f"⚠️  Директория не найдена в Drive: {self.csv_dir}")
-                print("ℹ️  Создаю директорию...")
+                print(f"  Директория не найдена в Drive: {self.csv_dir}")
+                print("  Создаю директорию...")
                 os.makedirs(self.csv_dir, exist_ok=True)
 
                 # Создаем README файл
@@ -79,12 +74,11 @@ class DriveDataLoader:
                     f.write("Загрузите сюда файлы в формате JSON\n")
                     f.write(f"Создано: {datetime.now()}")
 
-                print(f"✅ Создана новая директория в Google Drive")
+                print(f" Создана новая директория в Google Drive")
             else:
-                print(f"✅ Директория найдена в Google Drive")
+                print(f" Директория найдена в Google Drive")
 
     def load_all_calls(self, limit: int = None) -> List[Dict]:
-        """Загружает все звонки из CSV файла"""
         if self.calls_cache is not None:
             return self.calls_cache[:limit] if limit else self.calls_cache
 
@@ -92,29 +86,29 @@ class DriveDataLoader:
 
         # Проверяем существование директории
         if not os.path.exists(self.csv_dir):
-            print(f"❌ Директория не найдена: {self.csv_dir}")
+            print(f" Директория не найдена: {self.csv_dir}")
             if self.drive_path:
-                print(f"ℹ️  Убедитесь, что папка существует в Google Drive")
-                print(f"📍 Ожидаемый путь: {self.csv_dir}")
+                print(f"  Убедитесь, что папка существует в Google Drive")
+                print(f" Ожидаемый путь: {self.csv_dir}")
             return []
 
         # Ищем CSV файлы
         try:
             csv_files = [f for f in os.listdir(self.csv_dir) if f.endswith('.csv')]
         except Exception as e:
-            print(f"❌ Ошибка чтения директории: {e}")
+            print(f" Ошибка чтения директории: {e}")
             return []
 
         if not csv_files:
-            print(f"⚠️  В директории {self.csv_dir} нет CSV файлов")
-            print("ℹ️  Ожидаемый формат CSV: колонки 'date', 'text', 'tags'")
+            print(f"  В директории {self.csv_dir} нет CSV файлов")
+            print("  Ожидаемый формат CSV: колонки 'date', 'text', 'tags'")
             return []
 
         # Берем первый CSV файл (можно расширить для нескольких)
         csv_file = csv_files[0]
         filepath = os.path.join(self.csv_dir, csv_file)
 
-        print(f"📂 Читаю данные из CSV файла: {csv_file}")
+        print(f" Читаю данные из CSV файла: {csv_file}")
 
         try:
             # Читаем CSV файл
@@ -127,32 +121,26 @@ class DriveDataLoader:
                 }
             )
 
-            # Проверяем необходимые колонки
             required_columns = ['date', 'text', 'tags']
             missing_columns = [col for col in required_columns if col not in df.columns]
 
             if missing_columns:
-                print(f"❌ В CSV файле отсутствуют колонки: {missing_columns}")
+                print(f" В CSV файле отсутствуют колонки: {missing_columns}")
                 print(f"   Доступные колонки: {list(df.columns)}")
                 return []
 
             print(f"✅ Загружено {len(df)} строк из CSV")
 
-            # Конвертируем DataFrame в список словарей
             for idx, row in df.iterrows():
-                # Получаем дату (уже в формате datetime благодаря parse_dates)
                 call_date = pd.to_datetime(row['date'])
 
-                # Если tags - строка, конвертируем в список
                 tags = row['tags']
                 if isinstance(tags, str):
                     try:
-                        # Обрабатываем формат: "['tag1', 'tag2']"
                         tags = eval(tags) if tags.startswith('[') else tags.split(',')
                     except:
                         tags = []
 
-                # Формируем структурированную запись
                 call_record = {
                     'id': f"call_{idx}",
                     'file_name': csv_file,
@@ -170,47 +158,41 @@ class DriveDataLoader:
 
                 all_calls.append(call_record)
 
-                # Ограничение по количеству записей
                 if limit and idx + 1 >= limit:
                     break
 
             self.calls_cache = all_calls
 
-            # Выводим статистику
-            print(f"✅ Преобразовано {len(all_calls)} записей звонков")
+            print(f" Преобразовано {len(all_calls)} записей звонков")
 
             if self.drive_path:
-                print(f"🌐 Данные загружены из Google Drive")
+                print(f" Данные загружены из Google Drive")
 
-            # Дополнительная информация о данных
             if all_calls:
                 dates = [c['call_date'] for c in all_calls if c['call_date']]
                 if dates:
                     min_date = min(dates)
                     max_date = max(dates)
-                    print(f"📅 Диапазон дат: {min_date.strftime('%d.%m.%Y')} - {max_date.strftime('%d.%m.%Y')}")
+                    print(f" Диапазон дат: {min_date.strftime('%d.%m.%Y')} - {max_date.strftime('%d.%m.%Y')}")
 
-                # Подсчет уникальных тегов
                 all_tags = []
                 for call in all_calls:
                     all_tags.extend(call['tags'])
                 unique_tags = set(all_tags)
-                print(f"🏷️  Уникальных тегов: {len(unique_tags)}")
+                print(f"  Уникальных тегов: {len(unique_tags)}")
 
             return all_calls
 
         except pd.errors.EmptyDataError:
-            print(f"❌ CSV файл {csv_file} пустой")
+            print(f" CSV файл {csv_file} пустой")
             return []
         except Exception as e:
-            print(f"❌ Ошибка чтения CSV файла {csv_file}: {e}")
+            print(f" Ошибка чтения CSV файла {csv_file}: {e}")
             import traceback
             traceback.print_exc()
             return []
 
     def _extract_date_from_filename(self, filename: str) -> datetime:
-        """Извлекает дату из имени файла"""
-        # Паттерны для поиска даты в имени файла
         patterns = [
             r'(\d{4})-(\d{2})-(\d{2})',  # YYYY-MM-DD
             r'(\d{2})\.(\d{2})\.(\d{4})',  # DD.MM.YYYY
@@ -232,15 +214,13 @@ class DriveDataLoader:
                         year, month, day = int(groups[0]), int(groups[1]), int(groups[2])
                         return datetime(year, month, day)
 
-        # Если дата не найдена, используем дату изменения файла
         filepath = os.path.join(self.csv_dir, filename)
         if os.path.exists(filepath):
             try:
                 return datetime.fromtimestamp(os.path.getmtime(filepath))
             except:
                 pass
-
-        # Fallback: текущая дата
+        # Fallback:
         return datetime.now()
 
     def setup_in_memory_db(self):
@@ -309,12 +289,11 @@ class DriveDataLoader:
         self.conn.commit()
 
         source = "Google Drive" if self.drive_path else "локальной папки"
-        print(f"✅ Данные загружены в in-memory SQLite ({len(calls)} записей из {source})")
+        print(f" Данные загружены в in-memory SQLite ({len(calls)} записей из {source})")
         return self.conn
 
     @contextmanager
     def get_cursor(self):
-        """Контекстный менеджер для курсора"""
         if self.conn is None:
             self.setup_in_memory_db()
 
@@ -328,14 +307,17 @@ class DriveDataLoader:
 # ==================== DeepSeek Planner ====================
 
 class DeepSeekPlanner:
-    """LLM планировщик запросов"""
 
-    def __init__(self, model, datasphere_node_url=None, drive_path=None):
+    def __init__(self, model, datasphere_node_url=None, drive_path=None, config_path='config.yml'):
         self.is_local = False  #isinstance(model, Llama)
 
         self.drive_path = drive_path
-        self.available_tags = self._load_available_tags()
         self.timeout = 600
+        with open(config_path, 'r', encoding='utf-8') as file:
+            config = yaml.safe_load(file)
+        
+        self.available_tags = config.get('tags_list', [])
+        
         print(f"deep seek planner timeout {self.timeout}")
 
         if self.is_local:
@@ -350,9 +332,7 @@ class DeepSeekPlanner:
             self._setup_ollama_client()
 
 
-
     def _setup_ollama_client(self):
-        """Настраивает клиент Ollama с учетом Google Drive"""
         print("setup_version_1.0")
         try:
             # Настройка для Colab
@@ -362,60 +342,26 @@ class DeepSeekPlanner:
             if self.drive_path:
                 models_cache_dir = os.path.join(self.drive_path, "models_cache")
                 os.makedirs(models_cache_dir, exist_ok=True)
-                print(f"🌐 Кэш моделей Ollama в Google Drive: {models_cache_dir}")
+                print(f" Кэш моделей Ollama в Google Drive: {models_cache_dir}")
 
             self.client = ollama.Client(host=host, timeout=self.timeout)
 
             # Проверяем доступность
             try:
                 self.client.list()
-                print(f"✅ Ollama подключен, модель: {self.model_name}")
+                print(f" Ollama подключен, модель: {self.model_name}")
             except Exception as e:
-                print(f"⚠️  Ошибка подключения к Ollama: {e}")
-                print("ℹ️  Убедитесь, что Ollama запущен в Colab")
+                print(f"  Ошибка подключения к Ollama: {e}")
+                print("  Убедитесь, что Ollama запущен в Colab")
 
         except ImportError:
-            print("❌ Ollama не установлен")
+            print(" Ollama не установлен")
             raise
 
-    def _load_available_tags(self) -> List[str]:
-        """Загружает все уникальные теги из JSON файлов"""
-        # В реальности нужно загрузить из данных
-        return [
-            "низкое_качество_стирки_или_чистки",
-            "не_заменили_ковры_вовремя",
-            "клиент_хочет_добавить_ковры",
-            "клиент_хочет_меньше_ковров",
-            "погашение_долга",
-            "расторжение_договора",
-            "возобновление_услуг",
-            "долго_нет_ответа_на_заявку",
-            "лишняя_доставка",
-            "доставили_не_те_ковры",
-            "не_выставлен_вовремя_счет",
-            "неверная_сумма_в_счете",
-            "ковер_забрали_без_причины",
-            "забрали_не_тот_ковер",
-            "менеджер_нагрубил_клиенту",
-            "неоправданно_высокие_цены",
-            "неоправданный_рост_цен",
-            "новый_клиент_заключение_договора",
-            "консультация_или_уточнение_деталей",
-            "поменять_спецификации",
-            "менеджер_обещал_но_не_связался_с_клиентом",
-            "клиент_уходит_к_конкурентам",
-            "приостановить_услуги",
-            "ошибка_в_документах"
-        ]
 
-    def create_analysis_plan(self, user_query: str) -> AnalysisPlan:
-        """Создает план анализа на основе запроса пользователя"""
+    def create_analysis_plan(self, user_query: str, query_history: [] = None) -> AnalysisPlan:
+        prompt = self._build_planner_prompt(user_query, query_history)
 
-        prompt = self._build_planner_prompt(user_query)
-
-
-        # print("DEBUG:")
-        # print(f"{prompt}")
         if self.is_local:
             response = self.model(
                 prompt,
@@ -432,17 +378,13 @@ class DeepSeekPlanner:
         try:
             plan_data = json.loads(response['response'])
         except:
-            print("Модель дура и вернула фигню:")
             print(response['response'])
             raise
 
-        # Парсим временной период
         time_period = self._parse_time_period(plan_data.get('time_period', {}))
 
-        # Валидируем теги
         target_tags = self._validate_tags(plan_data.get('target_tags', []))
 
-        # Парсим метрики
         metrics = self._parse_metrics(plan_data.get('metrics', []))
 
         return AnalysisPlan(
@@ -456,23 +398,28 @@ class DeepSeekPlanner:
 
 
 
-    def _build_planner_prompt(self, user_query: str) -> str:
-        """Строит промпт для планировщика"""
-        current_date = datetime.now().strftime("%Y-%m-%d")
-
-        # Добавляем информацию о источнике данных
-        data_source = "Google Drive" if self.drive_path else "локальной базы данных"
-        
+    def _build_planner_prompt(self, user_query: str, query_history: [] = None) -> str:
+        current_date = datetime.now().strftime("%Y-%m-%d")        
         tags = ', '.join(self.available_tags)
+        
+        if query_history:
+            n = len(query_history)
+            n = min(n, 3)
+            queries = ''
+            for i in range(n):
+                queries = queries.join(query_history[-n-1]['query'])+'; '
+            inject = f'ПРОЧТИ ПРЕДЫДУЩИЕ ЗАПРОСЫ (ты уже ответил на них ранее!), ЕСЛИ КОНТЕКСТ НЕОБХОДИМ ТЕБЕ ДЛЯ ПОНИМАНИЯ НОВОГО ЗАПРОСА: "{queries}".'
+        else:
+            inject = ''
 
-        return f"""Ты — аналитик базы телефонных звонков компании по аренде ковров.
 
-ИСТОЧНИК ДАННЫХ: {data_source}
+        return f"""Ты — аналитик базы телефонных звонков и писем компании по аренде ковров.
 
-ЗАПРОС: "{user_query}"
+ЗАПРОС ТВОЕГО ПОЛЬЗОВАТЕЛЯ: "{user_query}".
+{inject}
 
 ТВОЯ ЗАДАЧА: Создать план анализа.
-Система будет обращаться по твоему плану к текстам с записями телефонных звонков клиентов за несколько последних лет, содержащими описательные теги каждого звонка.
+Система будет обращаться по твоему плану к текстам с записями телефонных звонков и писем клиентов за несколько последних лет, содержащими описательные теги каждого звонка.
 
 ДОСТУПНЫЕ ТЕГИ:
 {tags}
@@ -480,10 +427,10 @@ class DeepSeekPlanner:
 МЕТРИКИ, которые система может посчитать для тебя для ответа на запрос, если это необходимо:
 1. count_by_tag - подсчет звонков с заданным тегом за период
 2. top_n_tags - самые частые теги звонков за период
-3. tag_trends - динамика тега по времени: стал ли чаще или реже встречаться за период?
+3. tag_trends - динамика тега по времени: стал ли тег чаще или реже встречаться за период? Система сгруппирует подсчет тегов по месяцам, неделям или дням, в зависимости от твоей инструкции. Например, чтобы увидеть динамику встречаемости тега за год или полгода, лучше попроси группировать по месяцам, а чтобы посмотреть динамику за неделю, - по дням.
 Сегодняшняя дата: {current_date} - используй ее, чтобы правильно определить временной период из запроса в случае, если в запросе временной период указан относительно сегодняшнего дня (например, "в прошлом году" и т.п.)
 
-ВЕРНИ JSON с планом того, что системе нужно извлечь из данных для ответа на запрос, а именно: за какой период понадобятся данные? По каким имено тегам выбирать данные для ответа на данный запрос? Какие метрики подсчитать по этим данным для ответа на данный запрос?
+ВЕРНИ JSON с планом того, что системе нужно извлечь из данных для ответа на запрос, а именно: за какой период понадобятся данные? По каким именно тегам выбирать данные для ответа на данный запрос? Какие метрики подсчитать по этим данным для ответа на данный запрос?
 
 {{
   "time_period": {{
@@ -500,29 +447,12 @@ class DeepSeekPlanner:
 """
 
     def _parse_time_period(self, period_data: Dict) -> Dict[str, Any]:
-        """Парсит временной период"""
         today = datetime.now()
         description = period_data.get('description', '')
 
-        # Начальные значения
-        start = today - timedelta(days=30)  # По умолчанию последний месяц
+        start = today - timedelta(days=30)
         end = today
 
-        # Определяем период на основе описания
-        if 'последние 6 месяцев' in description.lower():
-            start = today - timedelta(days=30 * 6)
-        elif 'этот месяц' in description.lower():
-            start = datetime(today.year, today.month, 1)
-        elif 'этот год' in description.lower():
-            start = datetime(today.year, 1, 1)
-        elif 'первый квартал 2024' in description.lower():
-            start = datetime(2024, 1, 1)
-            end = datetime(2024, 3, 31)
-        elif 'прошлый год' in description.lower():
-            start = datetime(today.year - 1, 1, 1)
-            end = datetime(today.year - 1, 12, 31)
-
-        # Переопределяем если указаны точные даты
         if period_data.get('start'):
             try:
                 start = datetime.fromisoformat(period_data['start'])
@@ -541,10 +471,8 @@ class DeepSeekPlanner:
         }
 
     def _validate_tags(self, tags: List[str]) -> List[str]:
-        """Фильтрует и нормализует теги"""
         valid_tags = []
         for tag in tags:
-            # Ищем похожие теги
             for available_tag in self.available_tags:
                 if tag.lower() in available_tag.lower() or available_tag.lower() in tag.lower():
                     valid_tags.append(available_tag)
@@ -596,21 +524,16 @@ class DeepSeekPlanner:
 # ==================== Query Executor ====================
 
 class JSONQueryExecutor:
-    """Выполняет аналитические запросы к JSON данным"""
-
     def __init__(self, data_loader: DriveDataLoader):
         self.data_loader = data_loader
 
     def execute_plan(self, plan: AnalysisPlan) -> Dict[str, Any]:
-        """Выполняет план анализа"""
-
         results = {}
 
-        # Получаем данные за период
         all_calls = self.data_loader.load_all_calls()
 
         if not all_calls:
-            print("⚠️  Нет данных для анализа")
+            print("  Нет данных для анализа")
             return {
                 'error': 'Нет данных для анализа',
                 'summary_stats': {
@@ -624,7 +547,6 @@ class JSONQueryExecutor:
         filtered_calls = self._filter_calls_by_period(all_calls, plan.time_period)
         print(f'{len(filtered_calls)} звонков после фильтрации по периоду')
 
-        # Выполняем метрики
         for metric in plan.metrics:
             if metric == MetricType.COUNT_BY_TAG:
                 results['count_by_tag'] = self._count_by_tag(filtered_calls, plan.target_tags)
@@ -656,7 +578,6 @@ class JSONQueryExecutor:
         return results
 
     def _filter_calls_by_period(self, calls: List[Dict], period: Dict) -> List[Dict]:
-        """Фильтрует звонки по временному периоду"""
         start_date = period['start']
         end_date = period['end']
 
@@ -669,7 +590,6 @@ class JSONQueryExecutor:
         return filtered
 
     def _count_by_tag(self, calls: List[Dict], target_tags: List[str]) -> Dict[str, int]:
-        """Подсчет звонков по тегам"""
         counts = defaultdict(int)
 
         for call in calls:
@@ -683,15 +603,12 @@ class JSONQueryExecutor:
         return dict(counts)
 
     def _tag_trends(self, calls: List[Dict], target_tags: List[str], grouping: str) -> Dict[str, List]:
-        """Динамика тегов по времени"""
         if not target_tags or not calls:
             return {}
 
-        # Группируем по месяцам/неделям
         trends = defaultdict(lambda: defaultdict(int))
 
         for call in calls:
-            # Определяем ключ группировки
             if grouping == 'month':
                 period_key = call['call_date'].strftime('%Y-%m')
             elif grouping == 'week':
@@ -700,14 +617,12 @@ class JSONQueryExecutor:
             else:  # day
                 period_key = call['call_date'].strftime('%Y-%m-%d')
 
-            # Считаем теги
             for tag in call['tags']:
                 for target in target_tags:
                     if target.lower() in tag.lower() or tag.lower() in target.lower():
                         trends[target][period_key] += 1
                         break
 
-        # Преобразуем в список для каждого тега
         result = {}
         for tag, period_counts in trends.items():
             result[tag] = [
@@ -718,7 +633,6 @@ class JSONQueryExecutor:
         return result
 
     def _top_n_tags(self, calls: List[Dict], n: int = 5) -> List[Dict]:
-        """Топ-N самых частых тегов"""
         tag_counter = Counter()
 
         for call in calls:
@@ -730,7 +644,6 @@ class JSONQueryExecutor:
         ]
 
     def _compare_tags(self, calls: List[Dict], tags: List[str]) -> Dict[str, Any]:
-        """Сравнивает два тега"""
         if len(tags) < 2:
             tags = tags + [None] * (2 - len(tags))
 
@@ -747,8 +660,6 @@ class JSONQueryExecutor:
 # ==================== DeepSeek Analyzer ====================
 
 class DeepSeekAnalyzer:
-    """LLM для анализа результатов и генерации ответов"""
-
     def __init__(self, model, datasphere_node_url = None, drive_path: str = None):
         self.is_local = False # isinstance(model, Llama)
         self.timeout = 600
@@ -769,7 +680,7 @@ class DeepSeekAnalyzer:
                     timeout=self.timeout  # Увеличенный таймаут для больших моделей
                 )
             except ImportError:
-                print("❌ Ollama не установлен")
+                print(" Ollama не установлен")
                 raise
 
         self.drive_path = drive_path
@@ -777,8 +688,6 @@ class DeepSeekAnalyzer:
 
 
     def generate_answer(self, user_query: str, results: Dict, plan: AnalysisPlan) -> str:
-        """Генерирует итоговый ответ на основе результатов"""
-
         prompt = self._build_analyzer_prompt(user_query, results, plan)
         
         #print(f"DEBUG analyzer_prompt: {prompt}")
@@ -797,16 +706,12 @@ class DeepSeekAnalyzer:
             return response['response'].strip()
 
         except Exception as e:
-            print(f"❌ Ошибка анализатора: {e}")
+            print(f" Ошибка анализатора: {e}")
             return self._generate_fallback_answer(results, plan)
 
     def _build_analyzer_prompt(self, user_query: str, results: Dict, plan: AnalysisPlan) -> str:
-        """Строит промпт для анализатора"""
-
-        # Форматируем результаты для промпта
         results_str = json.dumps(results, ensure_ascii=False, indent=2, default=str)
 
-        # Добавляем информацию об источнике
         data_source = "Google Drive" if self.drive_path else "локальной базы"
 
         return f"""Ты — старший аналитик компании по аренде ковров.
@@ -844,15 +749,15 @@ class DeepSeekAnalyzer:
         answer_parts = []
 
         # Краткий вывод
-        answer_parts.append(f"📊 Анализ за период: {plan.time_period['description']}")
+        answer_parts.append(f" Анализ за период: {plan.time_period['description']}")
 
         # Количество по тегам
         if 'count_by_tag' in results and results['count_by_tag']:
-            answer_parts.append("\n📈 Количество звонков по тегам:")
+            answer_parts.append("\n Количество звонков по тегам:")
             for tag, count in results['count_by_tag'].items():
                 answer_parts.append(f"  • {tag}: {count}")
         else:
-            answer_parts.append("\n⚠️  Нет данных по указанным тегам")
+            answer_parts.append("\n  Нет данных по указанным тегам")
 
         # Динамика
         if 'tag_trends' in results:
@@ -861,15 +766,15 @@ class DeepSeekAnalyzer:
                     first = trends[0]['count']
                     last = trends[-1]['count']
                     change = ((last - first) / first * 100) if first > 0 else 0
-                    trend_desc = "📈 рост" if change > 0 else "📉 снижение" if change < 0 else "➡️ без изменений"
-                    answer_parts.append(f"\n📅 Динамика '{tag}': {trend_desc} ({abs(change):.1f}%)")
+                    trend_desc = " рост" if change > 0 else " снижение" if change < 0 else " без изменений"
+                    answer_parts.append(f"\n Динамика '{tag}': {trend_desc} ({abs(change):.1f}%)")
 
         # Рекомендации
         if 'count_by_tag' in results and results['count_by_tag']:
             max_tag = max(results['count_by_tag'].items(), key=lambda x: x[1])[0] if results['count_by_tag'] else None
             if max_tag and ('жалоба' in max_tag or 'низкое' in max_tag):
                 answer_parts.append(
-                    f"\n💡 Рекомендация: Обратите внимание на тег '{max_tag}' - это самая частая категория обращений")
+                    f"\n Рекомендация: Обратите внимание на тег '{max_tag}' - это самая частая категория обращений")
 
         return "\n".join(answer_parts)
 
@@ -877,8 +782,6 @@ class DeepSeekAnalyzer:
 # ==================== Главная MCP система ====================
 
 class JSONCallAnalyticsMCP:
-    """Главная MCP система для работы с Google Drive JSON файлами"""
-
     def __init__(self, json_directory: str, model, node_url=None, drive_path: str = None):
         self.drive_path = drive_path
         self.data_loader = DriveDataLoader(json_directory, drive_path)
@@ -887,40 +790,38 @@ class JSONCallAnalyticsMCP:
         self.analyzer = DeepSeekAnalyzer(model, node_url, drive_path)
 
         # Загружаем данные при инициализации
-        print("📂 Загружаю данные из JSON файлов...")
+        print(" Загружаю данные из JSON файлов...")
         self.total_calls = len(self.data_loader.load_all_calls())
 
         if self.total_calls == 0:
-            print("⚠️  Внимание: Нет данных для анализа")
+            print("  Внимание: Нет данных для анализа")
             if self.drive_path:
-                print(f"ℹ️  Проверьте наличие JSON файлов в Google Drive: {json_directory}")
+                print(f"  Проверьте наличие JSON файлов в Google Drive: {json_directory}")
         else:
-            print(f"✅ Загружено {self.total_calls} звонков")
+            print(f" Загружено {self.total_calls} звонков")
             if self.drive_path:
-                print(f"🌐 Данные загружены из Google Drive")
+                print(f" Данные загружены из Google Drive")
 
-    def process_query(self, user_query: str) -> Dict[str, Any]:
-        """Обрабатывает запрос пользователя"""
-
-        print(f"\n🔍 Анализирую запрос: '{user_query}'")
+    def process_query(self, user_query: str, query_history: [] = None) -> Dict[str, Any]:
+        print(f"\n Анализирую запрос: '{user_query}'")
 
         if self.drive_path:
-            print(f"🌐 Источник данных: Google Drive")
+            print(f" Источник данных: Google Drive")
 
         # 1. Планирование (LLM)
-        print("🤖 Создаю план анализа...")
-        analysis_plan = self.planner.create_analysis_plan(user_query)
+        print(" Создаю план анализа...")
+        analysis_plan = self.planner.create_analysis_plan(user_query, query_history)
 
-        print(f"   📅 Период: {analysis_plan.time_period['description']}, {analysis_plan.time_period['start']}, {analysis_plan.time_period['end']}")
-        print(f"   🏷️  Теги: {', '.join(analysis_plan.target_tags)}")
-        print(f"   📊 Метрики: {[m.value for m in analysis_plan.metrics]}")
+        print(f"    Период: {analysis_plan.time_period['description']}, {analysis_plan.time_period['start']}, {analysis_plan.time_period['end']}")
+        print(f"    Теги: {', '.join(analysis_plan.target_tags)}")
+        print(f"    Метрики: {[m.value for m in analysis_plan.metrics]}")
 
         # 2. Выполнение анализа
-        print("📊 Выполняю анализ...")
+        print(" Выполняю анализ...")
         analysis_results = self.executor.execute_plan(analysis_plan)
 
         # 3. Генерация ответа (LLM)
-        print("💭 Формулирую ответ...")
+        print(" Формулирую ответ...")
         answer = self.analyzer.generate_answer(user_query, analysis_results, analysis_plan)
 
         # 4. Формируем полный ответ
@@ -941,27 +842,26 @@ class JSONCallAnalyticsMCP:
         return response
 
     def _print_analysis_summary(self, results: Dict[str, Any]):
-        """Выводит краткую статистику анализа"""
-        print("📈 КРАТКАЯ СТАТИСТИКА:")
+        print(" КРАТКАЯ СТАТИСТИКА:")
         print("-" * 40)
 
         if 'summary_stats' in results:
             stats = results['summary_stats']
-            print(f"📅 Период: {stats.get('period', 'N/A')}")
-            print(f"📞 Проанализировано звонков: {stats.get('total_calls', 0)}")
-            print(f"📍 Источник данных: {stats.get('data_source', 'Local')}")
+            print(f" Период: {stats.get('period', 'N/A')}")
+            print(f" Проанализировано звонков: {stats.get('total_calls', 0)}")
+            print(f" Источник данных: {stats.get('data_source', 'Local')}")
 
         if 'count_by_tag' in results:
             counts = results['count_by_tag']
             if counts:
-                print("\n📊 Количество по тегам:")
+                print("\n Количество по тегам:")
                 for tag, count in counts.items():
                     print(f"  • {tag}: {count}")
             else:
-                print("\n⚠️  Нет совпадений по указанным тегам")
+                print("\n  Нет совпадений по указанным тегам")
 
         if 'top_n_tags' in results and results['top_n_tags']:
-            print("\n🏆 Топ теги:")
+            print("\n Топ теги:")
             for i, item in enumerate(results['top_n_tags'][:3], 1):
                 print(f"  {i}. {item['tag']}: {item['count']}")
 
@@ -971,13 +871,11 @@ class JSONCallAnalyticsMCP:
                     first = trends[0]['count']
                     last = trends[-1]['count']
                     change = ((last - first) / first * 100) if first > 0 else 0
-                    trend_icon = "📈" if change > 0 else "📉" if change < 0 else "➡️"
-                    print(f"\n📅 Динамика '{tag}': {trend_icon} {abs(change):.1f}%")
+                    print(f"\n Динамика '{tag}': {abs(change):.1f}%")
 
         print("-" * 40)
 
     def get_system_info(self) -> Dict[str, Any]:
-        """Возвращает информацию о системе"""
         calls = self.data_loader.load_all_calls()
 
         # Собираем все теги
@@ -1003,51 +901,4 @@ class JSONCallAnalyticsMCP:
             'drive_path': self.drive_path if self.drive_path else None
         }
 
-    def test_system(self) -> bool:
-        """Тестирует работоспособность системы"""
-        print("🧪 Тестирую систему...")
-
-        try:
-            # Тест 1: Загрузка данных
-            calls = self.data_loader.load_all_calls(limit=10)
-            if not calls:
-                print("❌ Нет данных для анализа")
-                if self.drive_path:
-                    print(f"ℹ️  Проверьте Google Drive: {self.data_loader.csv_dir}")
-                return False
-
-            print(f"✅ Загружено {len(calls)} тестовых записей")
-
-            # Тест 2: Планирование
-            test_query = "Тестовый запрос: жалобы на качество"
-            plan = self.planner.create_analysis_plan(test_query)
-            if not plan.target_tags:
-                print("❌ Планировщик не вернул теги")
-                return False
-
-            print(f"✅ Планировщик работает, выбраны теги: {plan.target_tags}")
-
-            # Тест 3: Выполнение
-            results = self.executor.execute_plan(plan)
-            if 'summary_stats' not in results:
-                print("❌ Исполнитель не вернул результаты")
-                return False
-
-            print(f"✅ Исполнитель проанализировал {results['summary_stats'].get('total_calls', 0)} звонков")
-
-            # Тест 4: Анализ
-            answer = self.analyzer.generate_answer(test_query, results, plan)
-            if not answer or len(answer) < 10:
-                print("❌ Анализатор не сгенерировал ответ")
-                return False
-
-            print(f"✅ Анализатор сгенерировал ответ длиной {len(answer)} символов")
-
-            print("\n🎉 Все тесты пройдены успешно!")
-            return True
-
-        except Exception as e:
-            print(f"❌ Ошибка при тестировании: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+   
