@@ -17,27 +17,18 @@ class AudioProcessor:
     _loaded_models = {}
     
     def __init__(self, model_size):
-        """
-        Инициализация анализатора аудио
-        model_size: "tiny", "base", "small", "medium", "large"
-        """
         self.model_size = model_size
         
-        # Проверяем, загружена ли уже модель этого размера
         if model_size not in self._loaded_models:
             print(f"Загрузка модели Whisper {model_size}...")
             self._loaded_models[model_size] = whisper.load_model(model_size)
-            print(f"✅ Модель {model_size} загружена!")
+            print(f" Модель {model_size} загружена!")
         else:
-            print(f"✅ Используем уже загруженную модель {model_size}")
+            print(f" Используем уже загруженную модель {model_size}")
         
         self.asr_model = self._loaded_models[model_size]
 
     def extract_date_from_filename(self, filename):
-        """
-        Извлечение даты из имени файла
-        Предполагается формат: YYYY-MM-DD_* или подобный
-        """
         try:
             # Пытаемся найти дату в формате YYYY-MM-DD
             for part in filename.split('_'):
@@ -62,10 +53,10 @@ class AudioProcessor:
         y, sr = librosa.load(audio_path, sr=None)
 
         if sr == 16000:
-            print(f"✅ Файл уже имеет частоту 16 кГц: {audio_path}")
+            print(f" Файл уже имеет частоту 16 кГц: {audio_path}")
             return audio_path
         else:
-            print(f"🔄 Конвертируем! {audio_path} из {sr} Hz в 16000 Hz...")
+            print(f" Конвертируем из {sr} Hz в 16000 Hz...")
 
             # Ресемплируем до 16 кГц
             y_16k = librosa.resample(y, orig_sr=sr, target_sr=16000)
@@ -87,10 +78,10 @@ class AudioProcessor:
         y, sr = librosa.load(audio_path, sr=None)
 
         if sr == 16000:
-            print(f"✅ Файл уже имеет частоту 16 кГц: {audio_path}")
+            print(f" Файл уже имеет частоту 16 кГц: {audio_path}")
             return audio_path
         else:
-            print(f"🔄 Конвертируем {audio_path} из {sr} Hz в 16000 Hz...")
+            print(f" Конвертируем из {sr} Hz в 16000 Hz...")
 
             # Конвертируем
             audio = AudioSegment.from_file(audio_path)
@@ -100,10 +91,6 @@ class AudioProcessor:
             return output_path
 
     def assess_quality(self, audio_path):
-        """
-        Оценка качества аудио (упрощенная версия)
-        Возвращает оценку от 1 до 10
-        """
         try:
             y, sr = librosa.load(audio_path, sr=16000)
 
@@ -187,111 +174,133 @@ class AudioProcessor:
         print(f"Estimated quality: {quality_score}/10")
 
         # Определяем, нужно ли транскрибировать
-        text = ""
+        text = '-'
         should_transcribe = transcribe_all or quality_score >= quality_threshold
 
         if should_transcribe:
             # Транскрибируем
             print("Транскрибация...")
             text = self.transcribe_audio(converted_path)
+            if text == '':
+                text = '-'
         else:
-            print("⏭️  Пропускаем транскрибацию (низкое качество)")
+            print(" Пропускаем транскрибацию (низкое качество)")
+            
 
         # Возвращаем результат для ВСЕХ файлов
         return {
             'date': date,
             'text': text,
-            'source_file': os.path.basename(audio_path),
+            'text_length': len(text),
+            'source_audio': os.path.basename(audio_path),
             'quality_score': quality_score,
-            'tags': ''  # Пустая колонка для тегов
+            'tags': '',
+            'summary': '',
+            'processing_date': datetime.now().isoformat(),
+            'batch_number': 0,
+            'whisper_model': self.model_size,
+            'audio_duration': 0
         }
 
     def process_directory(self, input_dir, output_csv, quality_threshold, transcribe_all):
-        """
-        Обработка всех аудиофайлов в директории
-        """
-        # Поддерживаемые форматы аудио
         audio_extensions = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac']
+        batch_size = 1
 
-        # Проверяем, существует ли уже CSV файл
         existing_files = set()
         if os.path.exists(output_csv):
-            print(f"📁 Найден существующий файл: {output_csv}")
+            print(f"Found existing file: {output_csv}")
             try:
                 existing_df = pd.read_csv(output_csv)
-                existing_files = set(existing_df['source_file'].tolist())
-                print(f"📊 В файле уже содержится {len(existing_files)} записей")
+                existing_files = set(existing_df['source_audio'].tolist())
+                print(f"File already contains {len(existing_files)} records")
             except Exception as e:
-                print(f"⚠️ Ошибка при чтении существующего файла: {e}")
+                print(f"Error reading existing file: {e}")
 
-        # Находим все аудиофайлы
         audio_files = []
         for file in os.listdir(input_dir):
             if any(file.lower().endswith(ext) for ext in audio_extensions):
                 file_path = os.path.join(input_dir, file)
-                # Пропускаем уже обработанные файлы
                 if file not in existing_files:
                     audio_files.append(file_path)
                 else:
-                    print(f"⏭️  Файл уже обработан: {file}")
+                    print(f"File already processed: {file}")
 
         if not audio_files:
-            print("ℹ️  Все файлы уже обработаны ранее")
+            print("All files have been processed previously")
             if os.path.exists(output_csv):
                 return pd.read_csv(output_csv).to_dict('records')
             return []
 
-        print(f"Найдено {len(audio_files)} новых аудиофайлов для обработки")
+        print(f"Found {len(audio_files)} new audio files to process")
 
-        # Обрабатываем файлы
-        results = []
-        for i, audio_file in enumerate(audio_files, 1):
-            print(f"\n📁 Обработка файла {i}/{len(audio_files)}")
-            try:
-                result = self.process_file(audio_file, quality_threshold, transcribe_all)
-                results.append(result)  # Теперь добавляем ВСЕ результаты
-                print(f"✅ Добавлен в список: {os.path.basename(audio_file)}")
-            except Exception as e:
-                print(f"❌ Ошибка при обработке {audio_file}: {e}")
+        batches = [audio_files[i:i + batch_size] for i in range(0, len(audio_files), batch_size)]
+        print(f"Files split into {len(batches)} batches of {batch_size} files")
 
-        # Объединяем старые и новые данные
-        if results:
-            new_df = pd.DataFrame(results)
+        total_processed = 0
+        all_results = []
 
-            if os.path.exists(output_csv):
-                # Загружаем существующие данные
-                existing_df = pd.read_csv(output_csv)
-                # Объединяем
-                final_df = pd.concat([existing_df, new_df], ignore_index=True)
-                # Убираем возможные дубликаты (на всякий случай)
-                final_df = final_df.drop_duplicates(subset=['source_file'], keep='first')
-            else:
-                final_df = new_df
-
-            # Сортируем по дате
-            final_df = final_df.sort_values('date')
-
-            # Сохраняем в CSV
-            final_df.to_csv(output_csv, index=False, encoding='utf-8-sig')
+        for batch_num, batch_files in enumerate(batches, 1):
             print(f"\n{'=' * 60}")
-            print(f"✅ Обработка завершена!")
-            print(f"📊 Всего записей в файле: {len(final_df)}")
-            print(f"🆕 Добавлено новых записей: {len(results)}")
-            print(f"💾 Результаты сохранены в: {output_csv}")
+            print(f"Processing batch {batch_num}/{len(batches)}")
             print(f"{'=' * 60}")
 
-            # Показываем краткую статистику
-            print("\n📈 Статистика:")
-            print(f"Средняя оценка качества: {final_df['quality_score'].mean():.1f}")
-            print(f"Общее количество символов текста: {final_df['text'].str.len().sum()}")
-            print(f"Количество файлов с оценкой >=8: {(final_df['quality_score'] >= 8).sum()}")
+            batch_results = []
 
-            return final_df.to_dict('records')
-        else:
-            print("❌ Не найдено новых файлов, соответствующих критериям качества")
-            if os.path.exists(output_csv):
-                return pd.read_csv(output_csv).to_dict('records')
-            return []
+            for i, audio_file in enumerate(batch_files, 1):
+                global_idx = total_processed + i
+                print(f"\nProcessing file {global_idx}/{len(audio_files)} (batch {batch_num}, file {i}/{len(batch_files)})")
+                try:
+                    result = self.process_file(audio_file, quality_threshold, transcribe_all)
+                    batch_results.append(result)
+                    print(f"Added to list: {os.path.basename(audio_file)}")
+                except Exception as e:
+                    print(f"Error processing {audio_file}: {e}")
+
+            if batch_results:
+                batch_df = pd.DataFrame(batch_results)
+
+                write_mode = 'a' if os.path.exists(output_csv) and batch_num > 1 else 'w'
+                write_header = not (os.path.exists(output_csv) and batch_num > 1)
+
+                if write_mode == 'a' and batch_num > 1:
+                    existing_df = pd.read_csv(output_csv)
+                    final_df = pd.concat([existing_df, batch_df], ignore_index=True)
+                    final_df = final_df.drop_duplicates(subset=['source_audio'], keep='first')
+                    final_df = final_df.sort_values('date')
+                    final_df.to_csv(output_csv, index=False, encoding='utf-8-sig')
+                else:
+                    if os.path.exists(output_csv) and batch_num == 1:
+                        existing_df = pd.read_csv(output_csv)
+                        final_df = pd.concat([existing_df, batch_df], ignore_index=True)
+                        final_df = final_df.drop_duplicates(subset=['source_audio'], keep='first')
+                        final_df = final_df.sort_values('date')
+                    else:
+                        final_df = batch_df.sort_values('date')
+
+                    final_df.to_csv(output_csv, index=False, encoding='utf-8-sig')
+
+                total_processed += len(batch_results)
+                all_results.extend(batch_results)
+
+                print(f"\nBatch {batch_num} results:")
+                print(f"Files processed in batch: {len(batch_results)}")
+                print(f"Total files processed: {total_processed}/{len(audio_files)}")
+                print(f"Intermediate results saved to: {output_csv}")
+
+        print(f"\n{'=' * 60}")
+        print(f"All batches processing completed!")
+        print(f"Total records in file: {len(pd.read_csv(output_csv))}")
+        print(f"New records added: {total_processed}")
+        print(f"Results saved to: {output_csv}")
+        print(f"{'=' * 60}")
+
+        final_df = pd.read_csv(output_csv)
+        print("\nStatistics:")
+        print(f"Average quality score: {final_df['quality_score'].mean():.1f}")
+        print(f"Total text characters: {final_df['text'].str.len().sum()}")
+        print(f"Files with score >=8: {(final_df['quality_score'] >= 8).sum()}")
+
+        return final_df.to_dict('records')
 
 
 def run():

@@ -11,6 +11,8 @@ from contextlib import contextmanager
 import pandas as pd
 from typing import Union
 import ollama
+import yaml
+import ast
 #from llama_cpp import Llama
 
 
@@ -92,7 +94,6 @@ class DriveDataLoader:
                 print(f" Ожидаемый путь: {self.csv_dir}")
             return []
 
-        # Ищем CSV файлы
         try:
             csv_files = [f for f in os.listdir(self.csv_dir) if f.endswith('.csv')]
         except Exception as e:
@@ -104,20 +105,18 @@ class DriveDataLoader:
             print("  Ожидаемый формат CSV: колонки 'date', 'text', 'tags'")
             return []
 
-        # Берем первый CSV файл (можно расширить для нескольких)
         csv_file = csv_files[0]
         filepath = os.path.join(self.csv_dir, csv_file)
 
         print(f" Читаю данные из CSV файла: {csv_file}")
 
         try:
-            # Читаем CSV файл
             df = pd.read_csv(
                 filepath,
                 encoding='utf-8',
-                parse_dates=['date'],  # Автоматически парсим дату
+                parse_dates=['date'],
                 converters={
-                    'tags': lambda x: eval(x) if isinstance(x, str) else []  # Конвертируем строку в список
+                    'tags': lambda x: ast.literal_eval(x) if isinstance(x, str) and x.strip() else []
                 }
             )
 
@@ -224,7 +223,7 @@ class DriveDataLoader:
         return datetime.now()
 
     def setup_in_memory_db(self):
-        """Создает in-memory SQLite базу для быстрых запросов"""
+        """Creates in-memory SQLite for fast queries"""
         if self.conn is not None:
             return self.conn
 
@@ -308,7 +307,7 @@ class DriveDataLoader:
 
 class DeepSeekPlanner:
 
-    def __init__(self, model, datasphere_node_url=None, drive_path=None, config_path='config.yml'):
+    def __init__(self, model, datasphere_node_url=None, client=None, drive_path=None, config_path='phonecall/config.yml'):
         self.is_local = False  #isinstance(model, Llama)
 
         self.drive_path = drive_path
@@ -317,46 +316,10 @@ class DeepSeekPlanner:
             config = yaml.safe_load(file)
         
         self.available_tags = config.get('tags_list', [])
+        self.client = client
+        self.model_name = model
         
         print(f"deep seek planner timeout {self.timeout}")
-
-        if self.is_local:
-            self.model = model
-            self.model_name = 'local'
-        elif datasphere_node_url:
-            self.client = ollama.Client(host=datasphere_node_url, timeout=self.timeout)
-            self.model_name = 'from_yandex_node'
-            print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
-        else:
-            self.model_name = model
-            self._setup_ollama_client()
-
-
-    def _setup_ollama_client(self):
-        print("setup_version_1.0")
-        try:
-            # Настройка для Colab
-            host = "http://localhost:11434"
-
-            # Если есть Google Drive, можно кэшировать модели
-            if self.drive_path:
-                models_cache_dir = os.path.join(self.drive_path, "models_cache")
-                os.makedirs(models_cache_dir, exist_ok=True)
-                print(f" Кэш моделей Ollama в Google Drive: {models_cache_dir}")
-
-            self.client = ollama.Client(host=host, timeout=self.timeout)
-
-            # Проверяем доступность
-            try:
-                self.client.list()
-                print(f" Ollama подключен, модель: {self.model_name}")
-            except Exception as e:
-                print(f"  Ошибка подключения к Ollama: {e}")
-                print("  Убедитесь, что Ollama запущен в Colab")
-
-        except ImportError:
-            print(" Ollama не установлен")
-            raise
 
 
     def create_analysis_plan(self, user_query: str, query_history: [] = None) -> AnalysisPlan:
@@ -373,7 +336,7 @@ class DeepSeekPlanner:
                 model=self.model_name,
                 prompt=prompt,
                 format="json",
-                options={'temperature': 0.1, 'timeout': self.timeout}
+                options={'temperature': 0.1, 'timeout': self.timeout, 'num_ctx': 30000}
             )
         try:
             plan_data = json.loads(response['response'])
@@ -401,16 +364,16 @@ class DeepSeekPlanner:
     def _build_planner_prompt(self, user_query: str, query_history: [] = None) -> str:
         current_date = datetime.now().strftime("%Y-%m-%d")        
         tags = ', '.join(self.available_tags)
-        
-        if query_history:
-            n = len(query_history)
-            n = min(n, 3)
-            queries = ''
-            for i in range(n):
-                queries = queries.join(query_history[-n-1]['query'])+'; '
-            inject = f'ПРОЧТИ ПРЕДЫДУЩИЕ ЗАПРОСЫ (ты уже ответил на них ранее!), ЕСЛИ КОНТЕКСТ НЕОБХОДИМ ТЕБЕ ДЛЯ ПОНИМАНИЯ НОВОГО ЗАПРОСА: "{queries}".'
-        else:
-            inject = ''
+        inject = ''
+        # if query_history:
+        #     n = len(query_history)
+        #     n = min(n, 3)
+        #     queries = ''
+        #     for i in range(n):
+        #         queries = queries.join(query_history[-n-1]['query'])+'; '
+        #     inject = f'ПРОЧТИ ПРЕДЫДУЩИЕ ЗАПРОСЫ (ты уже ответил на них ранее!), ЕСЛИ КОНТЕКСТ НЕОБХОДИМ ТЕБЕ ДЛЯ ПОНИМАНИЯ НОВОГО ЗАПРОСА: "{queries}".'
+        # else:
+        #     inject = ''
 
 
         return f"""Ты — аналитик базы телефонных звонков и писем компании по аренде ковров.
@@ -427,7 +390,10 @@ class DeepSeekPlanner:
 МЕТРИКИ, которые система может посчитать для тебя для ответа на запрос, если это необходимо:
 1. count_by_tag - подсчет звонков с заданным тегом за период
 2. top_n_tags - самые частые теги звонков за период
-3. tag_trends - динамика тега по времени: стал ли тег чаще или реже встречаться за период? Система сгруппирует подсчет тегов по месяцам, неделям или дням, в зависимости от твоей инструкции. Например, чтобы увидеть динамику встречаемости тега за год или полгода, лучше попроси группировать по месяцам, а чтобы посмотреть динамику за неделю, - по дням.
+3. tag_trends - система сгруппирует подсчет тегов по месяцам, неделям или дням, в зависимости от твоей инструкции. Например, чтобы увидеть динамику встречаемости тега за год или полгода, лучше попроси группировать по месяцам, а чтобы посмотреть динамику за неделю, - по дням. Ты получишь массив с встречаемостью тега в каждой группе, с указанием дат. Например, при группировке по месяцам, ты увидишь даты начала и конца каждого месяца и соответствующее ему число тегов.
+
+Также каждый звонок имеет ровно один тег "call". Он нужен, если необходимо посчитать количество всех звонков за какой-либо период. Если твоего пользователя интересует число звонков независимо от их содержания, используй тег "call" для их группировки и / или подсчета.
+
 Сегодняшняя дата: {current_date} - используй ее, чтобы правильно определить временной период из запроса в случае, если в запросе временной период указан относительно сегодняшнего дня (например, "в прошлом году" и т.п.)
 
 ВЕРНИ JSON с планом того, что системе нужно извлечь из данных для ответа на запрос, а именно: за какой период понадобятся данные? По каким именно тегам выбирать данные для ответа на данный запрос? Какие метрики подсчитать по этим данным для ответа на данный запрос?
@@ -567,7 +533,6 @@ class JSONQueryExecutor:
                     plan.comparison_tags or plan.target_tags[:2]
                 )
 
-        # Добавляем общую статистику
         results['summary_stats'] = {
             'total_calls': len(filtered_calls),
             'period': plan.time_period['description'],
@@ -660,7 +625,7 @@ class JSONQueryExecutor:
 # ==================== DeepSeek Analyzer ====================
 
 class DeepSeekAnalyzer:
-    def __init__(self, model, datasphere_node_url = None, drive_path: str = None):
+    def __init__(self, model, datasphere_node_url = None, client = None, drive_path: str = None):
         self.is_local = False # isinstance(model, Llama)
         self.timeout = 600
         print(f"deep seek analizer timeout {self.timeout}")
@@ -674,14 +639,7 @@ class DeepSeekAnalyzer:
             print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
         else:
             self.model_name = model
-            try:
-                self.client = ollama.Client(
-                    host="http://localhost:11434",
-                    timeout=self.timeout  # Увеличенный таймаут для больших моделей
-                )
-            except ImportError:
-                print(" Ollama не установлен")
-                raise
+            self.client = client
 
         self.drive_path = drive_path
 
@@ -700,7 +658,7 @@ class DeepSeekAnalyzer:
                 response = self.client.generate(
                     model=self.model_name,
                     prompt=prompt,
-                    options={'temperature': 0.3}
+                    options={'temperature': 0.3, 'num_ctx': 30000}
                 )
 
             return response['response'].strip()
@@ -716,8 +674,6 @@ class DeepSeekAnalyzer:
 
         return f"""Ты — старший аналитик компании по аренде ковров.
 
-ИСТОЧНИК ДАННЫХ: Анализ выполнен на данных из {data_source}
-
 ЗАПРОС КЛИЕНТА: "{user_query}"
 
 Для ответа на запрос система выбрала тексты обращений клиентов за нужный период и посчитала нужные метрики.
@@ -731,13 +687,11 @@ class DeepSeekAnalyzer:
 ТВОЯ ЗАДАЧА:
 1. Проанализировать цифры в этих результатах (если результат не пустой!)
 2. Ответить на запрос клиента
-3. Выделить ключевые инсайты
-4. Говорить конкретно, с цифрами
+3. Говорить конкретно, с цифрами
 
 ФОРМАТ:
 - Краткий вывод
 - Детальный анализ
-- Рекомендации (если есть)
 
 Если ты видишь, что система дала тебе пустые метрики, или информации в результатах не достаточно для ответа на запрос клиента, - так и напиши.
 
@@ -748,10 +702,8 @@ class DeepSeekAnalyzer:
 
         answer_parts = []
 
-        # Краткий вывод
         answer_parts.append(f" Анализ за период: {plan.time_period['description']}")
 
-        # Количество по тегам
         if 'count_by_tag' in results and results['count_by_tag']:
             answer_parts.append("\n Количество звонков по тегам:")
             for tag, count in results['count_by_tag'].items():
@@ -759,7 +711,6 @@ class DeepSeekAnalyzer:
         else:
             answer_parts.append("\n  Нет данных по указанным тегам")
 
-        # Динамика
         if 'tag_trends' in results:
             for tag, trends in results['tag_trends'].items():
                 if trends:
@@ -769,7 +720,6 @@ class DeepSeekAnalyzer:
                     trend_desc = " рост" if change > 0 else " снижение" if change < 0 else " без изменений"
                     answer_parts.append(f"\n Динамика '{tag}': {trend_desc} ({abs(change):.1f}%)")
 
-        # Рекомендации
         if 'count_by_tag' in results and results['count_by_tag']:
             max_tag = max(results['count_by_tag'].items(), key=lambda x: x[1])[0] if results['count_by_tag'] else None
             if max_tag and ('жалоба' in max_tag or 'низкое' in max_tag):
@@ -783,14 +733,12 @@ class DeepSeekAnalyzer:
 
 class JSONCallAnalyticsMCP:
     def __init__(self, json_directory: str, model, node_url=None, drive_path: str = None):
+        self.is_local = False
+        self.timeout = 600
         self.drive_path = drive_path
         self.data_loader = DriveDataLoader(json_directory, drive_path)
-        self.planner = DeepSeekPlanner(model, node_url, drive_path)
         self.executor = JSONQueryExecutor(self.data_loader)
-        self.analyzer = DeepSeekAnalyzer(model, node_url, drive_path)
 
-        # Загружаем данные при инициализации
-        print(" Загружаю данные из JSON файлов...")
         self.total_calls = len(self.data_loader.load_all_calls())
 
         if self.total_calls == 0:
@@ -801,6 +749,45 @@ class JSONCallAnalyticsMCP:
             print(f" Загружено {self.total_calls} звонков")
             if self.drive_path:
                 print(f" Данные загружены из Google Drive")
+                
+        
+        if self.is_local:
+            self.model = model
+            self.model_name = 'local'
+        elif node_url:
+            self.client = ollama.Client(host=node_url, timeout=self.timeout)
+            self.model_name = 'from_yandex_node'
+            print(f"Mode: Yandex DataSphere (node url: {datasphere_node_url})")
+        else:
+            self.model_name = model
+            self._setup_ollama_client()
+            
+        self.planner = DeepSeekPlanner(model, node_url, self.client, drive_path)
+        self.analyzer = DeepSeekAnalyzer(model, node_url, self.client, drive_path)
+
+
+    def _setup_ollama_client(self):
+        print("setup_version_1.0")
+        try:
+            host = "http://localhost:11434"
+
+            if self.drive_path:
+                models_cache_dir = os.path.join(self.drive_path, "models_cache")
+                os.makedirs(models_cache_dir, exist_ok=True)
+                print(f" Кэш моделей Ollama в Google Drive: {models_cache_dir}")
+
+            self.client = ollama.Client(host=host, timeout=self.timeout)
+
+            try:
+                self.client.list()
+                print(f" Ollama подключен, модель: {self.model_name}")
+            except Exception as e:
+                print(f"  Ошибка подключения к Ollama: {e}")
+                print("  Убедитесь, что Ollama запущен в Colab")
+
+        except ImportError:
+            print(" Ollama не установлен")
+            raise
 
     def process_query(self, user_query: str, query_history: [] = None) -> Dict[str, Any]:
         print(f"\n Анализирую запрос: '{user_query}'")
@@ -808,7 +795,6 @@ class JSONCallAnalyticsMCP:
         if self.drive_path:
             print(f" Источник данных: Google Drive")
 
-        # 1. Планирование (LLM)
         print(" Создаю план анализа...")
         analysis_plan = self.planner.create_analysis_plan(user_query, query_history)
 
@@ -816,15 +802,12 @@ class JSONCallAnalyticsMCP:
         print(f"    Теги: {', '.join(analysis_plan.target_tags)}")
         print(f"    Метрики: {[m.value for m in analysis_plan.metrics]}")
 
-        # 2. Выполнение анализа
         print(" Выполняю анализ...")
         analysis_results = self.executor.execute_plan(analysis_plan)
 
-        # 3. Генерация ответа (LLM)
         print(" Формулирую ответ...")
         answer = self.analyzer.generate_answer(user_query, analysis_results, analysis_plan)
 
-        # 4. Формируем полный ответ
         response = {
             'query': user_query,
             'analysis_plan': analysis_plan.to_dict(),
@@ -836,7 +819,6 @@ class JSONCallAnalyticsMCP:
             'data_source': 'Google Drive' if self.drive_path else 'Local'
         }
 
-        # 5. Выводим краткую статистику
         self._print_analysis_summary(analysis_results)
 
         return response
@@ -878,14 +860,12 @@ class JSONCallAnalyticsMCP:
     def get_system_info(self) -> Dict[str, Any]:
         calls = self.data_loader.load_all_calls()
 
-        # Собираем все теги
         all_tags = []
         for call in calls:
             all_tags.extend(call['tags'])
 
         unique_tags = set(all_tags)
 
-        # Даты
         dates = [call['call_date'] for call in calls]
 
         return {
